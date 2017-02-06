@@ -1,0 +1,7 @@
+[package]
+name = "rustboy"
+version = "0.1.0"
+authors = ["Chase Miller"]
+
+[dependencies]
+byteorder = "0.4.2"
