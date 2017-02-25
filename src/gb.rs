@@ -1,7 +1,3 @@
-
-//use super::bus;
-//use super::cpu;
-
 use super::bus::Bus;
 use super::cpu::Cpu;
 
@@ -18,5 +14,9 @@ impl Gameboy {
 
     pub fn power_on(&mut self) {
         self.cpu.power_on();
+
+        loop {
+            self.cpu.step();
+        }
     }
 }

@@ -1,8 +1,6 @@
-use std::io::{Read};
-use super::byteorder::{LittleEndian, ByteOrder};
-
 const CARTRIDGE_ROM_START: u16 = 0;
 const CARTRIDGE_ROM_END: u16 = 0x7FFF;
+#[allow(dead_code)]
 const CARTRIDGE_ROM_SIZE: usize = 32 * 1024;
 
 const WORK_RAM_START: u16 = 0xC000;
@@ -53,7 +51,8 @@ impl Addressable for CartridgeRom {
         self.data[addr as usize]
     }
 
-    fn write(&mut self, addr: u16, val: u8) {
+
+    fn write(&mut self, _: u16, _: u8) {
         panic!("Cannot write to ROM!")
     }
 }
