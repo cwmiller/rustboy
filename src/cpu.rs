@@ -94,6 +94,23 @@ impl Cpu {
             0x1E => { self.ld_r_d8(E); 8 },
             0x1F => { self.rra(); 4 },
 
+            0x20 => self.jr(Condition::Nz),
+            0x21 => { self.ld_rr_d16(HL); 12 },
+            0x22 => { self.ldi_hl_a(); 8 },
+            0x23 => { self.inc_rr(HL); 8 },
+            0x24 => { self.inc_r(H); 4 },
+            0x25 => { self.dec_r(H); 4 },
+            0x26 => { self.ld_r_d8(H); 8 },
+            0x27 => { self.daa(); 4 },
+            0x28 => { self.jr(Condition::Z) },
+            0x29 => { self.add_rr_rr(HL, HL); 8 },
+            0x2A => { self.ldi_a_hl(); 8 },
+            0x2B => { self.dec_rr(HL); 8 },
+            0x2C => { self.inc_r(L); 4 },
+            0x2D => { self.dec_r(L); 4 },
+            0x2E => { self.ld_r_d8(L); 8 },
+            0x2F => { self.cpl(); 4 },
+
             _ => panic!("Unknown opcode: {:#X}", opcode)
         }
     }
@@ -142,6 +159,24 @@ impl Cpu {
         self.regs.a = val;
     }
 
+    // LD (HL+), A
+    #[inline(always)]
+    fn ldi_hl_a(&mut self) {
+        let addr = self.regs.read_u16(&Register16::HL);
+
+        self.bus.write(addr, self.regs.a);
+        self.regs.write_u16(&Register16::HL, addr.wrapping_add(1));
+    }
+
+    // LD A, (HL+)
+    #[inline(always)]
+    fn ldi_a_hl(&mut self) {
+        let addr = self.regs.read_u16(&Register16::HL);
+
+        self.regs.a = self.bus.read(addr);
+        self.regs.write_u16(&Register16::HL, addr.wrapping_add(1));
+    }
+
     /*
      * 8-bit math instructions
      */
@@ -179,6 +214,19 @@ impl Cpu {
                 else { 0 }
             | self.regs.flags & (Flag::C as u8)                         // C
     }
+
+    // CPL
+    // Flags affected: N, H
+    #[inline(always)]
+    fn cpl(&mut self) {
+        self.regs.a = !self.regs.a;
+
+        self.regs.flags =
+            self.regs.flags
+            | (Flag::N as u8)
+            | (Flag::H as u8)
+    }
+
 
     /*
      * 8-bit bit instructions
@@ -242,6 +290,13 @@ impl Cpu {
             | adj << 4                          // C
     }
 
+    // DAA
+    // Flags affected: Z, H, C
+    #[inline(always)]
+    fn daa (&mut self) {
+        // TODO
+    }
+
     /*
      * 16-bit load instructions
      */
@@ -301,15 +356,22 @@ impl Cpu {
 
     // JR c, r8
     #[inline(always)]
-    fn jr(&mut self, condition: Condition) {
-        let pc = self.regs.pc;
-        let offset = self.inc_imm_byte() as i16;
+    fn jr(&mut self, condition: Condition) -> usize {
+        let mut cycles = 8;
 
-        if (offset > 0) {
-            self.regs.pc = pc.wrapping_add(offset as u16);
-        } else {
-            self.regs.pc = pc.wrapping_sub(offset.abs() as u16);
+        if self.condition_met(condition) {
+            cycles = 12;
+            let pc = self.regs.pc;
+            let offset = self.inc_imm_byte() as i16;
+
+            if offset > 0 {
+                self.regs.pc = pc.wrapping_add(offset as u16);
+            } else {
+                self.regs.pc = pc.wrapping_sub(offset.abs() as u16);
+            }
         }
+
+        cycles
     }
 
     /*
