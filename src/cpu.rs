@@ -128,21 +128,38 @@ impl Cpu {
      * 8-bit math instructions
      */
 
-     // INC r
+    // INC r
+    // Affects flags: Z, N, H
     #[inline(always)]
     fn inc_r(&mut self, reg: Register8) {
         let val = self.regs.read_u8(&reg);
-        self.regs.write_u8(&reg, val.wrapping_add(1));
+        let increased = val.wrapping_add(1);
 
-        // TODO: flags
+        self.regs.write_u8(&reg, increased);
+
+        self.regs.flags =
+            (if increased == 0 { 1 << 7 } else { 0 })   // Z
+            | (((val & 0xF) + 1) & 0b00010000) << 1     // H
+            | self.regs.flags & (Flag::C as u8)         // C
+
     }
 
+    // DEC r
+    // Affects flags: Z, N, H
     #[inline(always)]
     fn dec_r(&mut self, reg: Register8) {
         let val = self.regs.read_u8(&reg);
-        self.regs.write_u8(&reg, val.wrapping_sub(1));
+        let decreased = val.wrapping_sub(1);
 
-        // TODO: flags
+        self.regs.write_u8(&reg, decreased);
+
+        self.regs.flags =
+            (if decreased == 0 { 1 << 7 } else { 0 })                   // Z
+            | Flag::N as u8                                             // N
+            | if (((val & 0xF0) - 1) & 0b00001000) == 0b00001000        // H
+                { 1 << 6 }
+                else { 0 }
+            | self.regs.flags & (Flag::C as u8)                         // C
     }
 
     /*
@@ -150,17 +167,29 @@ impl Cpu {
      */
 
     // RLCA
+    // Affects flags: Z, N, H, C
     fn rlca(&mut self) {
-        self.regs.a = self.regs.a << 1;
+        let val = self.regs.a;
+        let adj = val << 1;
 
-        // TODO: flags
+        self.regs.a = adj;
+
+        self.regs.flags =
+            (if adj == 0 { 1 << 7 } else { 0 }) // Z
+            | (val & 0b10000000) >> 3           // C
     }
 
     // RRCA
+    // Affects flags: Z, N, H, C
     fn rrca(&mut self) {
-        self.regs.a = self.regs.a >> 1;
+        let val = self.regs.a;
+        let adj = val >> 1;
 
-        // TODO: flags
+        self.regs.a = adj;
+
+        self.regs.flags =
+            (if adj == 0 { 1 << 7 } else { 0 }) // Z
+            | val << 4                          // C
     }
 
     /*
@@ -201,6 +230,7 @@ impl Cpu {
     }
 
     // ADD rr, rr
+    // Affects flags: N, H, C
     #[inline(always)]
     fn add_rr_rr(&mut self, dest: Register16, src: Register16) {
         let src_val = self.regs.read_u16(&src);
@@ -208,7 +238,15 @@ impl Cpu {
 
         self.regs.write_u16(&dest, dest_val.wrapping_add(src_val));
 
-        // TODO: flags
+        let src_high = ((src_val & 0xF0) >> 8) as u8;
+        let dest_high = ((dest_val & 0xF0) >> 8) as u8;
+
+        self.regs.flags = 
+            (self.regs.flags & Flag::Z as u8) // Z
+            | (((dest_high & 0xF) + (src_high & 0xF)) & 0b00010000) << 1    // H
+            | if dest_val.wrapping_add(src_val) < src_val                   // C
+                { Flag::C as u8 }
+                else { 0 };
     }
 
     /*
