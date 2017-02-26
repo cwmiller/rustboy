@@ -76,6 +76,24 @@ impl Cpu {
             0x0D => { self.dec_r(C); 4 },
             0x0E => { self.ld_r_d8(C); 8 },
             0x0F => { self.rrca(); 4 },
+
+            0x10 => { self.stop(); 4 },
+            0x11 => { self.ld_rr_d16(DE); 12 },
+            0x12 => { self.ld_indrr_a(DE); 8 },
+            0x13 => { self.inc_rr(DE); 8 },
+            0x14 => { self.inc_r(D); 4 },
+            0x15 => { self.dec_r(D); 4 },
+            0x16 => { self.ld_r_d8(D); 8 },
+            0x17 => { self.rla(); 4 },
+            0x18 => { self.jr(Condition::None); 12 },
+            0x19 => { self.add_rr_rr(HL, DE); 8 },
+            0x1A => { self.ld_a_indrr(DE); 8 },
+            0x1B => { self.dec_rr(DE); 8 },
+            0x1C => { self.inc_r(E); 4 },
+            0x1D => { self.dec_r(E); 4 },
+            0x1E => { self.ld_r_d8(E); 8 },
+            0x1F => { self.rra(); 4 },
+
             _ => panic!("Unknown opcode: {:#X}", opcode)
         }
     }
@@ -168,9 +186,25 @@ impl Cpu {
 
     // RLCA
     // Affects flags: Z, N, H, C
+    #[inline(always)]
     fn rlca(&mut self) {
         let val = self.regs.a;
         let adj = val << 1;
+        let carry = (val >> 7) & 0b00000001;
+
+        self.regs.a = adj | carry;
+
+        self.regs.flags =
+            (if adj == 0 { 1 << 7 } else { 0 }) // Z
+            | carry << 4          // C
+    }
+
+    // RLA
+    // Affects flags: Z, N, H, C
+    #[inline(always)]
+    fn rla(&mut self) {
+        let val = self.regs.a;
+        let adj = (val << 1) | ((self.regs.flags & Flag::C as u8) >> 4);
 
         self.regs.a = adj;
 
@@ -181,15 +215,31 @@ impl Cpu {
 
     // RRCA
     // Affects flags: Z, N, H, C
+    #[inline(always)]
     fn rrca(&mut self) {
         let val = self.regs.a;
         let adj = val >> 1;
+        let carry = val & 0b00000001;
+
+        self.regs.a = adj | (carry << 7);
+
+        self.regs.flags =
+            (if adj == 0 { 1 << 7 } else { 0 }) // Z
+            | carry << 4                        // C
+    }
+
+    // RRA
+    // Affects flags: Z, N, H, C
+    #[inline(always)]
+    fn rra(&mut self) {
+        let val = self.regs.a;
+        let adj = (val >> 1) | ((self.regs.flags & Flag::C as u8) << 3);
 
         self.regs.a = adj;
 
         self.regs.flags =
             (if adj == 0 { 1 << 7 } else { 0 }) // Z
-            | val << 4                          // C
+            | adj << 4                          // C
     }
 
     /*
@@ -249,6 +299,19 @@ impl Cpu {
                 else { 0 };
     }
 
+    // JR c, r8
+    #[inline(always)]
+    fn jr(&mut self, condition: Condition) {
+        let pc = self.regs.pc;
+        let offset = self.inc_imm_byte() as i16;
+
+        if (offset > 0) {
+            self.regs.pc = pc.wrapping_add(offset as u16);
+        } else {
+            self.regs.pc = pc.wrapping_sub(offset.abs() as u16);
+        }
+    }
+
     /*
      * Misc instructions
      */
@@ -257,5 +320,13 @@ impl Cpu {
     #[inline(always)]
     fn nop(&self) {
         // Ahh, doing nothing feels so good!
+    }
+
+    // STOP 0
+    // TODO: halt cpu/lcd
+    #[inline(always)]
+    fn stop(&mut self) {
+        // This instruction is 2 bytes.
+        self.inc_imm_byte();
     }
 }
