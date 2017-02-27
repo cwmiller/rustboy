@@ -12,14 +12,16 @@ enum Condition {
 
 pub struct Cpu {
     regs: Registers,
-    bus: Bus
+    bus: Bus,
+    ime: bool
 }
 
 impl Cpu {
     pub fn new(bus: Bus) -> Cpu {
         Cpu {
             regs: Registers::default(),
-            bus: bus
+            bus: bus,
+            ime: false
         }
     }
 
@@ -34,6 +36,7 @@ impl Cpu {
         self.regs.l = 0x01;
         self.regs.sp = 0xFFFE;
         self.regs.pc = 0x100;
+        self.ime = true;
     }
 
     pub fn step(&mut self) -> usize {
@@ -230,6 +233,73 @@ impl Cpu {
             0x9E => { self.sbc_hl(); 8 },
             0x9F => { self.sbc_r(A); 4 },
 
+            0xA0 => { self.and_r(B); 4 },
+            0xA1 => { self.and_r(C); 4 },
+            0xA2 => { self.and_r(D); 4 },
+            0xA3 => { self.and_r(E); 4 },
+            0xA4 => { self.and_r(H); 4 },
+            0xA5 => { self.and_r(L); 4 },
+            0xA6 => { self.and_hl(); 8 },
+            0xA7 => { self.and_r(A); 4 },
+            0xA8 => { self.xor_r(B); 4},
+            0xA9 => { self.xor_r(C); 4 },
+            0xAA => { self.xor_r(D); 4 },
+            0xAB => { self.xor_r(E); 4 },
+            0xAC => { self.xor_r(H); 4 },
+            0xAD => { self.xor_r(L); 4 },
+            0xAE => { self.xor_hl(); 8 },
+            0xAF => { self.xor_r(A); 4 },
+
+            0xB0 => { self.or_r(B); 4 },
+            0xB1 => { self.or_r(C); 4 },
+            0xB2 => { self.or_r(D); 4 },
+            0xB3 => { self.or_r(E); 4 },
+            0xB4 => { self.or_r(H); 4 },
+            0xB5 => { self.or_r(L); 4 },
+            0xB6 => { self.or_hl(); 8 },
+            0xB7 => { self.or_r(A); 4 },
+            0xB8 => { self.cp_r(B); 4},
+            0xB9 => { self.cp_r(C); 4 },
+            0xBA => { self.cp_r(D); 4 },
+            0xBB => { self.cp_r(E); 4 },
+            0xBC => { self.cp_r(H); 4 },
+            0xBD => { self.cp_r(L); 4 },
+            0xBE => { self.cp_hl(); 8 },
+            0xBF => { self.cp_r(A); 4 },
+
+            0xC0 => self.ret(Condition::Nz),
+            0xC1 => { self.pop(BC); 12 },
+            0xC2 => self.jp_a16(Condition::Nz),
+            0xC3 => self.jp_a16(Condition::None),
+            0xC4 => self.call(Condition::Nz),
+            0xC5 => { self.push(BC); 16 },
+            0xC6 => { self.add_d8(); 8 },
+            0xC7 => { self.rst(0x00); 16 },
+            0xC8 => self.ret(Condition::Z),
+            0xC9 => self.ret(Condition::None),
+            0xCA => self.jp_a16(Condition::Z),
+            0xCB => { self.prefix(); 4 },
+            0xCC => self.call(Condition::Z),
+            0xCD => self.call(Condition::None),
+            0xCE => { self.adc_d8(); 8 },
+            0xCF => { self.rst(0x08); 16 },
+
+            0xD0 => self.ret(Condition::Nc),
+            0xD1 => { self.pop(DE); 12 },
+            0xD2 => self.jp_a16(Condition::Nc),
+            0xD3 => unimplemented!(),
+            0xD4 => self.call(Condition::Nc),
+            0xD5 => { self.push(DE); 16 },
+            0xD6 => { self.sub_d8(); 8 },
+            0xD7 => { self.rst(0x10); 16 },
+            0xD8 => self.ret(Condition::C),
+            0xD9 => { self.reti(); 16 },
+            0xDA => self.jp_a16(Condition::C),
+            0xDB => unimplemented!(),
+            0xDC => self.call(Condition::C),
+            0xDD => unimplemented!(),
+            0xDE => { self.sbc_d8(); 8 },
+            0xDF => { self.rst(0x18); 16 },
 
             _ => panic!("Unknown opcode: {:#X}", opcode)
         }
@@ -243,6 +313,23 @@ impl Cpu {
             Condition::Nc => !self.regs.is_flag_set(Flag::C),
             Condition::Nz => !self.regs.is_flag_set(Flag::Z)
         }
+    }
+
+    fn push_stack(&mut self, val: u16) {
+        let addr = self.regs.read_u16(&Register16::SP);
+        
+        self.bus.write(addr - 2, (val & 0x00FF) as u8);
+        self.bus.write(addr - 1, ((val >> 8) & 0x00FF) as u8);
+
+        self.regs.write_u16(&Register16::SP, addr - 2);
+    }
+
+    fn pop_stack(&mut self) -> u16 {
+        let addr = self.regs.read_u16(&Register16::SP);
+        let word = &[self.bus.read(addr), self.bus.read(addr + 1)];
+        self.regs.pc = self.regs.pc + 2;
+
+        LittleEndian::read_u16(word)
     }
 
     /* 
@@ -609,7 +696,7 @@ impl Cpu {
             | if sum < val { Flag::C as u8 } else { 0 }         // C
     }
 
-    // SUB A, r
+    // SUB r
     // Flags affected: Z, N, H, C
     #[inline(always)]
     fn sub_r(&mut self, src: Register8) {
@@ -619,7 +706,7 @@ impl Cpu {
         self.sub(val, dec);
     }
 
-    // SUB A, (HL)
+    // SUB (HL)
     // Flags affected: Z, N, H, C
     #[inline(always)]
     fn sub_hl(&mut self) {
@@ -630,7 +717,7 @@ impl Cpu {
         self.sub(val, dec);
     }
 
-    // SUB A, d8
+    // SUB d8
     // Flags affected: Z, N, H, C
     #[inline(always)]
     fn sub_d8(&mut self) {
@@ -701,6 +788,165 @@ impl Cpu {
             | if diff > val { Flag::C as u8 } else { 0 }        // C
     }
 
+    // AND r
+    // Flags affected: Z, N, H, C
+    #[inline(always)]
+    fn and_r(&mut self, src: Register8) {
+        let val = self.regs.read_u8(&src);
+
+        self.and(val);
+    }
+
+    // AND (HL)
+    // Flags affected: Z, N, H, C
+    #[inline(always)]
+    fn and_hl(&mut self) {
+        let addr = self.regs.read_u16(&Register16::HL);
+        let val = self.bus.read(addr);
+
+        self.and(val);
+    }
+
+    // AND d8
+    // Flags affected: Z, N, H, C
+    #[inline(always)]
+    fn and_d8(&mut self) {
+        let val = self.inc_imm_byte();
+
+        self.and(val);
+    }
+
+    #[inline(always)]
+    fn and(&mut self, val: u8) {
+        let existing = self.regs.a;
+        let res = existing & val;
+
+        self.regs.a = res;
+
+        self.regs.flags =
+            if res == 0 { 1 << 7 } else { 0 }   // Z
+            | Flag::H as u8                     // H
+    }
+
+    // XOR r
+    // Flags affected: Z, N, H, C
+    #[inline(always)]
+    fn xor_r(&mut self, src: Register8) {
+        let val = self.regs.read_u8(&src);
+
+        self.xor(val);
+    }
+
+    // XOR (HL)
+    // Flags affected: Z, N, H, C
+    #[inline(always)]
+    fn xor_hl(&mut self) {
+        let addr = self.regs.read_u16(&Register16::HL);
+        let val = self.bus.read(addr);
+
+        self.xor(val);
+    }
+
+    // XOR d8
+    // Flags affected: Z, N, H, C
+    #[inline(always)]
+    fn xor_d8(&mut self) {
+        let val = self.inc_imm_byte();
+
+        self.xor(val);
+    }
+
+    #[inline(always)]
+    fn xor(&mut self, val: u8) {
+        let existing = self.regs.a;
+        let res = existing ^ val;
+
+        self.regs.a = res;
+
+        self.regs.flags =
+            if res == 0 { 1 << 7 } else { 0 }   // Z
+    }
+
+    // OR r
+    // Flags affected: Z, N, H, C
+    #[inline(always)]
+    fn or_r(&mut self, src: Register8) {
+        let val = self.regs.read_u8(&src);
+
+        self.or(val);
+    }
+
+    // OR (HL)
+    // Flags affected: Z, N, H, C
+    #[inline(always)]
+    fn or_hl(&mut self) {
+        let addr = self.regs.read_u16(&Register16::HL);
+        let val = self.bus.read(addr);
+
+        self.or(val);
+    }
+
+    // OR d8
+    // Flags affected: Z, N, H, C
+    #[inline(always)]
+    fn or_d8(&mut self) {
+        let val = self.inc_imm_byte();
+
+        self.or(val);
+    }
+
+    #[inline(always)]
+    fn or(&mut self, val: u8) {
+        let existing = self.regs.a;
+        let res = existing | val;
+
+        self.regs.a = res;
+
+        self.regs.flags =
+            if res == 0 { 1 << 7 } else { 0 }   // Z
+    }
+
+    // CP r
+    // Flags affected: Z, N, H, C
+    #[inline(always)]
+    fn cp_r(&mut self, src: Register8) {
+        let val = self.regs.read_u8(&src);
+
+        self.cp(val);
+    }
+
+    // CP (HL)
+    // Flags affected: Z, N, H, C
+    #[inline(always)]
+    fn cp_hl(&mut self) {
+        let addr = self.regs.read_u16(&Register16::HL);
+        let val = self.bus.read(addr);
+
+        self.cp(val);
+    }
+
+    // CP d8
+    // Flags affected: Z, N, H, C
+    #[inline(always)]
+    fn cp_d8(&mut self) {
+        let val = self.inc_imm_byte();
+
+        self.cp(val);
+    }
+
+    #[inline(always)]
+    fn cp(&mut self, val: u8) {
+        let existing = self.regs.a;
+        //let diff = existing - val;
+
+        self.regs.flags =
+            if existing == val { 1 << 7 } else { 0 }                                // Z
+            | Flag::N as u8                                                         // N
+            | if (((existing & 0xF0) - (val & 0xF0)) & 0b00001000) == 0b00001000    // H
+                { 1 << 6 }
+                else { 0 }
+            | if existing < val { Flag::C as u8 } else { 0 }                        // C
+    }
 
     /*
      * 16-bit load instructions
@@ -719,6 +965,22 @@ impl Cpu {
         let addr = self.inc_imm_word();
         self.bus.write(addr, (self.regs.sp & 0x00FF) as u8);
         self.bus.write(addr + 1, (self.regs.sp >> 8) as u8);
+    }
+
+    // POP rr
+    #[inline(always)]
+    fn pop(&mut self, dest: Register16) {
+        let val = self.pop_stack();
+
+        self.regs.write_u16(&dest, val);
+    }
+
+    // PUSH rr
+    #[inline(always)]
+    fn push(&mut self, src: Register16) {
+        let val = self.regs.read_u16(&src);
+        
+        self.push_stack(val);
     }
 
     /*
@@ -779,6 +1041,68 @@ impl Cpu {
         cycles
     }
 
+    // RET
+    #[inline(always)]
+    fn ret(&mut self, condition: Condition) -> usize {
+        let mut cycles = 8;
+
+        if self.condition_met(condition) {
+            cycles = 20;
+            let addr = self.pop_stack();
+            self.regs.write_u16(&Register16::PC, addr);
+        }
+
+        cycles
+    }
+
+    // RETI
+    #[inline(always)]
+    fn reti(&mut self) {
+        let addr = self.pop_stack();
+        self.regs.write_u16(&Register16::PC, addr);
+        self.ime = true;
+    }
+
+    // JP c, a16
+    #[inline(always)]
+    fn jp_a16(&mut self, condition: Condition) -> usize {
+        let mut cycles = 12;
+
+        if self.condition_met(condition) {
+            cycles = 16;
+            let addr = self.inc_imm_word();
+            self.regs.write_u16(&Register16::PC, addr);
+        }
+
+        cycles
+    }
+
+    // CALL c, a16
+    #[inline(always)]
+    fn call(&mut self, condition: Condition) -> usize {
+        let mut cycles = 12;
+
+        if self.condition_met(condition) {
+            cycles = 24;
+            let addr = self.inc_imm_word();
+            let pc = self.regs.pc;
+           
+            self.push_stack(pc);
+            self.regs.write_u16(&Register16::PC, addr);
+        }
+
+        cycles
+    }
+
+    // RST u8
+    #[inline(always)]
+    fn rst(&mut self, addr: u8) {
+        let pc = self.regs.pc;
+        self.push_stack(pc);
+        self.regs.write_u16(&Register16::PC, addr as u16);
+    }
+
+
     /*
      * Misc instructions
      */
@@ -801,5 +1125,11 @@ impl Cpu {
     #[inline(always)]
     fn halt(&self) {
         println!("HALT unimplemented");
+    }
+
+    // PREFIX
+    #[inline(always)]
+    fn prefix(&self) {
+        println!("PREFIX unimplemented");
     }
 }
