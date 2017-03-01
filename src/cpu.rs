@@ -326,10 +326,10 @@ impl Cpu {
     fn condition_met(&self, cond: Condition) -> bool {
         match cond {
             Condition::None => true,
-            Condition::C => self.regs.is_flag_set(Flag::C),
-            Condition::Z => self.regs.is_flag_set(Flag::Z),
-            Condition::Nc => !self.regs.is_flag_set(Flag::C),
-            Condition::Nz => !self.regs.is_flag_set(Flag::Z)
+            Condition::C => (self.regs.flags & FLAG_C) == FLAG_C,
+            Condition::Z => (self.regs.flags & FLAG_Z) == FLAG_Z,
+            Condition::Nc => (self.regs.flags & FLAG_C) != FLAG_C,
+            Condition::Nz => (self.regs.flags & FLAG_Z) != FLAG_Z
         }
     }
 
@@ -499,9 +499,9 @@ impl Cpu {
         self.regs.write_u8(&reg, increased);
 
         self.regs.flags =
-            (if increased == 0 { 1 << 7 } else { 0 })   // Z
-            | (((val & 0xF) + 1) & 0b00010000) << 1     // H
-            | self.regs.flags & (Flag::C as u8)         // C
+            (if increased == 0 { FLAG_Z } else { 0 })   // Z
+            | (((val & 0xF) + 1) & 0x10) << 1           // H
+            | self.regs.flags & FLAG_C                  // C
     }
 
     // INC (HL)
@@ -515,9 +515,9 @@ impl Cpu {
         self.bus.write(addr, increased);
 
         self.regs.flags =
-            (if increased == 0 { 1 << 7 } else { 0 })   // Z
-            | (((val & 0xF) + 1) & 0b00010000) << 1     // H
-            | self.regs.flags & (Flag::C as u8)         // C
+            (if increased == 0 { FLAG_Z } else { 0 })   // Z
+            | (((val & 0xF) + 1) & 0x10) << 1           // H
+            | self.regs.flags & FLAG_C                  // C
     }
 
     // DEC r
@@ -530,12 +530,10 @@ impl Cpu {
         self.regs.write_u8(&reg, decreased);
 
         self.regs.flags =
-            (if decreased == 0 { 1 << 7 } else { 0 })                   // Z
-            | Flag::N as u8                                             // N
-            | if (((val & 0xF0) - 1) & 0b00001000) == 0b00001000        // H
-                { 1 << 6 }
-                else { 0 }
-            | self.regs.flags & (Flag::C as u8)                         // C
+            (if decreased == 0 { FLAG_Z } else { 0 })   // Z
+            | FLAG_N                                    // N
+            | if val > 0 { FLAG_H } else { 0 }          // H
+            | self.regs.flags & FLAG_C                  // C
     }
 
     // DEC (HL)
@@ -549,12 +547,10 @@ impl Cpu {
         self.bus.write(addr, decreased);
 
         self.regs.flags =
-            (if decreased == 0 { 1 << 7 } else { 0 })                   // Z
-            | Flag::N as u8                                             // N
-            | if (((val & 0xF0) - 1) & 0b00001000) == 0b00001000        // H
-                { 1 << 6 }
-                else { 0 }
-            | self.regs.flags & (Flag::C as u8)                         // C
+            (if decreased == 0 { FLAG_Z } else { 0 })   // Z
+            | FLAG_N                                    // N
+            | if val > 0 { FLAG_H } else { 0 }          // H
+            | self.regs.flags & FLAG_C                  // C
     }
 
     // CPL
@@ -562,11 +558,7 @@ impl Cpu {
     #[inline(always)]
     fn cpl(&mut self) {
         self.regs.a = !self.regs.a;
-
-        self.regs.flags =
-            self.regs.flags
-            | (Flag::N as u8)
-            | (Flag::H as u8)
+        self.regs.flags = self.regs.flags | FLAG_N | FLAG_H;
     }
 
 
@@ -585,7 +577,7 @@ impl Cpu {
         self.regs.a = adj | carry;
 
         self.regs.flags =
-            (if adj == 0 { 1 << 7 } else { 0 }) // Z
+            (if adj == 0 { FLAG_Z } else { 0 }) // Z
             | carry << 4                        // C
     }
 
@@ -594,12 +586,12 @@ impl Cpu {
     #[inline(always)]
     fn rla(&mut self) {
         let val = self.regs.a;
-        let adj = (val << 1) | ((self.regs.flags & Flag::C as u8) >> 4);
+        let adj = (val << 1) | ((self.regs.flags & FLAG_C) >> 4);
 
         self.regs.a = adj;
 
         self.regs.flags =
-            (if adj == 0 { 1 << 7 } else { 0 }) // Z
+            (if adj == 0 { FLAG_Z } else { 0 }) // Z
             | (val & 0b10000000) >> 3           // C
     }
 
@@ -609,12 +601,12 @@ impl Cpu {
     fn rrca(&mut self) {
         let val = self.regs.a;
         let adj = val >> 1;
-        let carry = val & 0b00000001;
+        let carry = val & 1;
 
         self.regs.a = adj | (carry << 7);
 
         self.regs.flags =
-            (if adj == 0 { 1 << 7 } else { 0 }) // Z
+            (if adj == 0 { FLAG_Z } else { 0 }) // Z
             | carry << 4                        // C
     }
 
@@ -623,12 +615,12 @@ impl Cpu {
     #[inline(always)]
     fn rra(&mut self) {
         let val = self.regs.a;
-        let adj = (val >> 1) | ((self.regs.flags & Flag::C as u8) << 3);
+        let adj = (val >> 1) | ((self.regs.flags & FLAG_C) << 3);
 
         self.regs.a = adj;
 
         self.regs.flags =
-            (if adj == 0 { 1 << 7 } else { 0 }) // Z
+            (if adj == 0 { FLAG_Z } else { 0 }) // Z
             | adj << 4                          // C
     }
 
@@ -643,18 +635,14 @@ impl Cpu {
     // Flags affected: N, H, C
     #[inline(always)]
     fn scf(&mut self) {
-        self.regs.flags = 
-            self.regs.flags & Flag::Z as u8 
-            | Flag::C as u8;
+        self.regs.flags = (self.regs.flags & FLAG_Z) | FLAG_C;
     }
 
     // CCF
     // Flags affected: N, H, C
     #[inline(always)]
     fn ccf(&mut self) {
-        self.regs.flags = 
-            self.regs.flags & Flag::Z as u8 
-            ^ Flag::C as u8;
+        self.regs.flags = (self.regs.flags & FLAG_Z) ^ FLAG_C
     }
 
     // ADD A, r
@@ -695,9 +683,9 @@ impl Cpu {
         self.regs.a = sum;
 
         self.regs.flags =
-            if sum == 0 { 1 << 7 } else { 0 }                   // Z
-            | (((val & 0xF) + (inc & 0xF)) & 0b00010000) << 1   // H
-            | if sum < val { Flag::C as u8 } else { 0 }         // C
+            if sum == 0 { FLAG_Z } else { 0 }           // Z
+            | (((val & 0xF) + (inc & 0xF)) & 0x10) << 1 // H
+            | if sum < val { FLAG_C } else { 0 }        // C
     }
 
     // ADD SP, r8
@@ -705,7 +693,8 @@ impl Cpu {
     #[inline(always)]
     fn add_sp_r8(&mut self) {
         let current = self.regs.sp;
-        let offset = self.inc_imm_byte() as i16;
+        let immediate = self.inc_imm_byte() as u16;
+        let offset = immediate as i16;
 
         if offset > 0 {
             self.regs.sp = current.wrapping_add(offset as u16);
@@ -713,7 +702,12 @@ impl Cpu {
             self.regs.sp = current.wrapping_sub(offset.abs() as u16);
         }
 
-        // TODO: flags
+        // I don't think this is right
+        self.regs.flags =
+            ((((current & 0xF) + (immediate  & 0xF)) & 0x10) as u8) << 1    // H
+            | if current.wrapping_add(immediate) < current                  // C
+                { FLAG_C } 
+                else { 0 }
     }
 
     // ADC A, r
@@ -751,16 +745,16 @@ impl Cpu {
     fn adc(&mut self, val: u8, inc: u8) {
         let mut sum = val.wrapping_add(inc);
 
-        if self.regs.flags & (Flag::C as u8) == (Flag::C as u8) {
+        if (self.regs.flags & FLAG_C) == FLAG_C {
             sum = sum.wrapping_add(1);
         }
 
         self.regs.a = sum;
 
         self.regs.flags =
-            if sum == 0 { 1 << 7 } else { 0 }                   // Z
-            | (((val & 0xF) + (inc & 0xF)) & 0b00010000) << 1   // H
-            | if sum < val { Flag::C as u8 } else { 0 }         // C
+            if sum == 0 { FLAG_Z } else { 0 }           // Z
+            | (((val & 0xF) + (inc & 0xF)) & 0x10) << 1 // H
+            | if sum < val { FLAG_C } else { 0 }        // C
     }
 
     // SUB r
@@ -801,10 +795,10 @@ impl Cpu {
         self.regs.a = diff;
 
         self.regs.flags =
-            if diff == 0 { 1 << 7 } else { 0 }                  // Z
-            | Flag::N as u8                                     // N
-            | (((val & 0xF0) - (dec & 0xF0)) & 0b00001000) << 1 // H
-            | if diff > val { Flag::C as u8 } else { 0 }        // C
+            if diff == 0 { FLAG_Z} else { 0 }                       // Z
+            | FLAG_N                                                // N
+            | if (val & 0xF0) > (dec & 0xF0) { FLAG_H } else { 0 }  // H
+            | if diff > val { FLAG_C } else { 0 }                   // C
     }
 
     // SBC A, r
@@ -842,17 +836,17 @@ impl Cpu {
     fn sbc(&mut self, val: u8, dec: u8) {
         let mut diff = val.wrapping_sub(dec);
 
-        if self.regs.flags & (Flag::C as u8) == (Flag::C as u8) {
+        if (self.regs.flags & FLAG_C) == FLAG_C {
             diff = diff.wrapping_sub(1);
         }
 
         self.regs.a = diff;
 
         self.regs.flags =
-            if diff == 0 { 1 << 7 } else { 0 }                  // Z
-            | Flag::N as u8                                     // N
-            | (((val & 0xF0) - (dec & 0xF0)) & 0b00001000) << 1 // H
-            | if diff > val { Flag::C as u8 } else { 0 }        // C
+            if diff == 0 { FLAG_Z } else { 0 }                      // Z
+            | FLAG_N                                                // N
+            | if (val & 0xF0) > (dec & 0xF0) { FLAG_H } else { 0 }  // H
+            | if diff > val { FLAG_C } else { 0 }                   // C
     }
 
     // AND r
@@ -891,8 +885,8 @@ impl Cpu {
         self.regs.a = res;
 
         self.regs.flags =
-            if res == 0 { 1 << 7 } else { 0 }   // Z
-            | Flag::H as u8                     // H
+            if res == 0 { FLAG_Z } else { 0 }   // Z
+            | FLAG_H                            // H
     }
 
     // XOR r
@@ -931,7 +925,7 @@ impl Cpu {
         self.regs.a = res;
 
         self.regs.flags =
-            if res == 0 { 1 << 7 } else { 0 }   // Z
+            if res == 0 { FLAG_Z } else { 0 }   // Z
     }
 
     // OR r
@@ -970,7 +964,7 @@ impl Cpu {
         self.regs.a = res;
 
         self.regs.flags =
-            if res == 0 { 1 << 7 } else { 0 }   // Z
+            if res == 0 { FLAG_Z } else { 0 }   // Z
     }
 
     // CP r
@@ -1004,15 +998,12 @@ impl Cpu {
     #[inline(always)]
     fn cp(&mut self, val: u8) {
         let existing = self.regs.a;
-        //let diff = existing - val;
 
         self.regs.flags =
-            if existing == val { 1 << 7 } else { 0 }                                // Z
-            | Flag::N as u8                                                         // N
-            | if (((existing & 0xF0) - (val & 0xF0)) & 0b00001000) == 0b00001000    // H
-                { 1 << 6 }
-                else { 0 }
-            | if existing < val { Flag::C as u8 } else { 0 }                        // C
+            if existing == val { FLAG_Z } else { 0 }                    // Z
+            | FLAG_N                                                    // N
+            | if (existing & 0xF0) > (val & 0xF0) { FLAG_H } else { 0 } // H
+            | if existing < val { FLAG_C } else { 0 }                   // C
     }
 
     /*
@@ -1088,10 +1079,10 @@ impl Cpu {
         let dest_high = ((dest_val & 0xF0) >> 8) as u8;
 
         self.regs.flags = 
-            (self.regs.flags & Flag::Z as u8) // Z
-            | (((dest_high & 0xF) + (src_high & 0xF)) & 0b00010000) << 1    // H
-            | if dest_val.wrapping_add(src_val) < src_val                   // C
-                { Flag::C as u8 }
+            (self.regs.flags & FLAG_Z)                              // Z
+            | (((dest_high & 0xF) + (src_high & 0xF)) & 0x10) << 1  // H
+            | if dest_val.wrapping_add(src_val) < src_val           // C
+                { FLAG_C }
                 else { 0 };
     }
 

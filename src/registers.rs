@@ -18,12 +18,10 @@ pub enum Register16 {
     PC
 }
 
-pub enum Flag {
-    Z = 0b10000000,
-    N = 0b01000000,
-    H = 0b00100000,
-    C = 0b00010000
-}
+pub const FLAG_Z: u8 = 0b10000000 ;
+pub const FLAG_N: u8 = 0b01000000;
+pub const FLAG_H: u8 = 0b00100000;
+pub const FLAG_C: u8 = 0b00010000;
 
 #[derive(Default)]
 pub struct Registers {
@@ -40,19 +38,6 @@ pub struct Registers {
 }
 
 impl Registers {
-    pub fn is_flag_set(&self, flag: Flag) -> bool {
-        let mask = flag as u8;
-        (mask & self.flags) == mask
-    }
-
-    pub fn set_flag(&mut self, flag: Flag, val: bool) {
-        self.flags = if val { 
-            self.flags | flag as u8
-        } else {
-            self.flags & !(flag as u8)
-        }
-    }
-
     pub fn read_u8(&self, reg: &Register8) -> u8 {
         use self::Register8::*;
 
