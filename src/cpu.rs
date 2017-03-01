@@ -318,6 +318,22 @@ impl Cpu {
             0xEE => { self.xor_d8(); 8 },
             0xEF => { self.rst(0x28); 16 },
 
+            0xF0 => { self.ldh_a_a8(); 12 },
+            0xF1 => { self.pop(AF); 12 },
+            0xF2 => { self.ld_a_c(); 8 },
+            0xF3 => { self.di(); 4 },
+            0xF4 => unimplemented!(),
+            0xF5 => { self.push(AF); 16 },
+            0xF6 => { self.or_d8(); 8 },
+            0xF7 => { self.rst(0x30); 16 },
+            0xF8 => { self.ldhl_sp_r8(); 12 },
+            0xF9 => { self.ld_sp_hl(); 8 },
+            0xFA => { self.ld_a_a16(); 16 },
+            0xFB => { self.ei(); 4 },
+            0xFC => unimplemented!(),
+            0xFD => unimplemented!(),
+            0xFE => { self.cp_d8(); 8 },
+            0xFF => { self.rst(0x38); 16 },
 
             _ => panic!("Unknown opcode: {:#X}", opcode)
         }
@@ -477,9 +493,9 @@ impl Cpu {
         self.bus.write(addr, val);
     }
 
-    // LDH A, (C)
+    // LD A, (C)
     #[inline(always)]
-    fn ldh_a_c(&mut self) {
+    fn ld_a_c(&mut self) {
         let addr = (self.regs.c as u16) + 0xFF00;
 
         self.regs.a = self.bus.read(addr);
@@ -717,7 +733,7 @@ impl Cpu {
         let val = self.regs.a;
         let inc = self.regs.read_u8(&src);
         
-        self.add(val, inc);
+        self.adc(val, inc);
     }
 
     // ADC A, (HL)
@@ -728,7 +744,7 @@ impl Cpu {
         let addr = self.regs.read_u16(&Register16::HL);
         let inc = self.bus.read(addr);
 
-        self.add(val, inc);
+        self.adc(val, inc);
     }
 
     // ADC A, d8
@@ -738,7 +754,7 @@ impl Cpu {
         let val = self.regs.a;
         let inc = self.inc_imm_byte();
         
-        self.add(val, inc);
+        self.adc(val, inc);
     }
 
     #[inline(always)]
@@ -1032,6 +1048,45 @@ impl Cpu {
         self.bus.write(addr, self.regs.a);
     }
 
+    // LD A, (a16)
+    #[inline(always)]
+    fn ld_a_a16(&mut self) {
+        let addr = self.inc_imm_word();
+        let val = self.bus.read(addr);
+
+        self.regs.a = val;
+    }
+
+    // LDHL SP, r8
+    // Affects flags: Z, N, H, C
+    #[inline(always)]
+    fn ldhl_sp_r8(&mut self) {
+        let sp = self.regs.sp;
+        let immediate = self.inc_imm_byte() as u16;
+        let offset = immediate as i16;
+
+        if offset > 0 {
+            self.regs.write_u16(&Register16::HL, sp.wrapping_add(offset as u16));
+        } else {
+            self.regs.write_u16(&Register16::HL, sp.wrapping_sub(offset.abs() as u16));
+        }
+
+        // I don't think this is right
+        self.regs.flags =
+            ((((sp & 0xF) + (immediate  & 0xF)) & 0x10) as u8) << 1 // H
+            | if sp.wrapping_add(immediate) < sp                    // C
+                { FLAG_C } 
+                else { 0 }
+    }
+
+    // LD SP, HL
+    #[inline(always)]
+    fn ld_sp_hl(&mut self) {
+        let hl = self.regs.read_u16(&Register16::HL);
+
+        self.regs.write_u16(&Register16::SP, hl);
+    }
+
     // POP rr
     #[inline(always)]
     fn pop(&mut self, dest: Register16) {
@@ -1203,5 +1258,15 @@ impl Cpu {
     #[inline(always)]
     fn prefix(&self) {
         println!("PREFIX unimplemented");
+    }
+
+    // DI
+    fn di(&mut self) {
+        self.ime = false;
+    }
+
+    // ER
+    fn ei(&mut self) {
+        self.ime = true;
     }
 }

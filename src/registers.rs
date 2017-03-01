@@ -18,7 +18,7 @@ pub enum Register16 {
     PC
 }
 
-pub const FLAG_Z: u8 = 0b10000000 ;
+pub const FLAG_Z: u8 = 0b10000000;
 pub const FLAG_N: u8 = 0b01000000;
 pub const FLAG_H: u8 = 0b00100000;
 pub const FLAG_C: u8 = 0b00010000;
