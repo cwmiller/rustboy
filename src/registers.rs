@@ -105,4 +105,19 @@ impl Registers {
             PC => self.pc = val
         }
     }
+
+    #[inline(always)]
+    pub fn has_flag(&self, flag: u8) -> bool {
+        self.flags & flag == flag
+    }
+
+    #[inline(always)]
+    pub fn set_flag(&mut self, flag: u8) {
+        self.flags = self.flags | flag
+    }
+
+    #[inline(always)]
+    pub fn reset_flag(&mut self, flag: u8) {
+        self.flags = self.flags ^ flag
+    }
 }

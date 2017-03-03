@@ -642,9 +642,37 @@ impl Cpu {
 
     // DAA
     // Flags affected: Z, H, C
+    // Based off from http://forums.nesdev.com/viewtopic.php?t=9088
     #[inline(always)]
     fn daa(&mut self) {
-        println!("DAA unimplemented");
+        let mut a = self.regs.a as u16;
+
+        if self.regs.has_flag(FLAG_N) {
+            if self.regs.has_flag(FLAG_H) {
+                a = (a - 6) & 0xFF;
+            }
+
+            if self.regs.has_flag(FLAG_C) {
+                a = a - 0x60;
+            }
+        } else {
+            if self.regs.has_flag(FLAG_H) || (a & 0x0F) > 9 {
+                a = a + 0x06
+            }
+
+            if self.regs.has_flag(FLAG_C) || a > 0x9F {
+                a = a + 0x60;
+            }
+        }
+
+        a = a & 0xFF;
+
+        self.regs.flags = 
+            if a == 0 { FLAG_C } else { 0 }                     // Z
+            | self.regs.flags & FLAG_N                          // N
+            | if (a & 0x100) == 0x100 { FLAG_C } else { 0 };    // C
+
+        self.regs.a = a as u8;
     }
 
     // SCF
