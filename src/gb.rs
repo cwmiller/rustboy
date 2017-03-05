@@ -1,14 +1,14 @@
 use super::bus::Bus;
-use super::cpu::Cpu;
+use super::cpu::Lr35902;
 
 pub struct Gameboy {
-    cpu: Cpu
+    cpu: Lr35902
 }
 
 impl Gameboy {
     pub fn new(rom: Vec<u8>) -> Gameboy {
         Gameboy {
-            cpu: Cpu::new(Bus::new(rom))
+            cpu: Lr35902::new(Bus::new(rom))
         }
     }
 

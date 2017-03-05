@@ -1,5 +1,5 @@
-use super::bus::{Bus, Addressable};
-use super::byteorder::{ByteOrder, LittleEndian};
+use super::super::bus::{Bus, Addressable};
+use super::super::byteorder::{ByteOrder, LittleEndian};
 use super::registers::*;
 
 // TODO: Remove all the code duplication and reduce the length of this file.
@@ -12,16 +12,16 @@ enum Condition {
     Nc
 }
 
-pub struct Cpu {
+pub struct Lr35902 {
     regs: Registers,
     bus: Bus,
     ime: bool,
     prefixed: bool
 }
 
-impl Cpu {
-    pub fn new(bus: Bus) -> Cpu {
-        Cpu {
+impl Lr35902 {
+    pub fn new(bus: Bus) -> Lr35902 {
+        Lr35902 {
             regs: Registers::default(),
             bus: bus,
             ime: false,

@@ -7,7 +7,6 @@ use std::io::Read;
 mod bus;
 mod cpu;
 mod gb;
-mod registers;
 
 use gb::Gameboy;
 
