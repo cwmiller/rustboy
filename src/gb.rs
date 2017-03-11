@@ -2,20 +2,24 @@ use super::bus::Bus;
 use super::cpu::Lr35902;
 
 pub struct Gameboy {
-    cpu: Lr35902
+    pub cpu: Lr35902
 }
 
 impl Gameboy {
-    pub fn new(rom: Vec<u8>) -> Gameboy {
+    pub fn new(rom: Vec<u8>) -> Self {
+        let cpu = Lr35902::new(Bus::new(rom));
+
         Gameboy {
-            cpu: Lr35902::new(Bus::new(rom))
+            cpu: cpu
         }
     }
 
     pub fn power_on(&mut self) {
         self.cpu.power_on();
+    }
 
-        loop {
+    pub fn step(&mut self, count: usize) {
+        for _ in 0..count {
             self.cpu.step();
         }
     }

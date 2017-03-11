@@ -13,7 +13,7 @@ enum Condition {
 }
 
 pub struct Lr35902 {
-    regs: Registers,
+    pub regs: Registers,
     bus: Bus,
     ime: bool,
     prefixed: bool
