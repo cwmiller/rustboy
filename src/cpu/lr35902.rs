@@ -1,5 +1,5 @@
-use super::super::bus::{Bus, Addressable};
-use super::super::byteorder::{ByteOrder, LittleEndian};
+use bus::{Bus, Addressable};
+use byteorder::{ByteOrder, LittleEndian};
 use super::registers::*;
 
 // TODO: Remove all the code duplication and reduce the length of this file.
@@ -14,7 +14,7 @@ enum Condition {
 
 pub struct Lr35902 {
     pub regs: Registers,
-    bus: Bus,
+    pub bus: Bus,
     ime: bool,
     prefixed: bool
 }
