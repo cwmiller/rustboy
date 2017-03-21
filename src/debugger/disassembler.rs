@@ -2,77 +2,78 @@ use bus::Bus;
 use bus::Addressable;
 use byteorder::{ByteOrder, LittleEndian};
 
-pub fn disassemble(bus: &Bus, pc: &mut u16, prefixed: &mut bool) -> String {
-    let opcode = imm_byte(bus, pc);
+pub fn disassemble(bus: &Bus, pc: &mut u16, prefixed: &mut bool) -> (Vec<u8>, String) {
+    let mut data = Vec::new();
+    let opcode = imm_byte(bus, pc, &mut data);
 
-    if !*prefixed {
+    let instruction = if !*prefixed {
         match opcode {
             0x00 => "NOP".to_string(),
-            0x01 => format!("LD BC, {:#X}", imm_word(bus, pc)),
+            0x01 => format!("LD BC, {:#X}", imm_word(bus, pc, &mut data)),
             0x02 => "LD (BC), A".to_string(),
             0x03 => "INC BC".to_string(),
             0x04 => "INC B".to_string(),
             0x05 => "DEC B".to_string(),
-            0x06 => format!("LD B, {:#X}", imm_byte(bus, pc)),
+            0x06 => format!("LD B, {:#X}", imm_byte(bus, pc, &mut data)),
             0x07 => "RLCA".to_string(),
-            0x08 => format!("LD ({:#X}), SP", imm_word(bus, pc)),
+            0x08 => format!("LD ({:#X}), SP", imm_word(bus, pc, &mut data)),
             0x09 => "ADD HL, BC".to_string(),
             0x0A => "LD A (BC)".to_string(),
             0x0B => "DEC BC".to_string(),
             0x0C => "INC C".to_string(),
             0x0D => "DEC C".to_string(),
-            0x0E => format!("LD C, {:#X}", imm_byte(bus, pc)),
+            0x0E => format!("LD C, {:#X}", imm_byte(bus, pc, &mut data)),
             0x0F => "RRCA".to_string(),
 
-            0x10 => { imm_byte(bus, pc); "STOP 0".to_string() },
-            0x11 => format!("LD DE, {:#X}", imm_word(bus, pc)),
+            0x10 => { imm_byte(bus, pc, &mut data); "STOP 0".to_string() },
+            0x11 => format!("LD DE, {:#X}", imm_word(bus, pc, &mut data)),
             0x12 => "LD (DE), A".to_string(),
             0x13 => "INC DE".to_string(),
             0x14 => "INC D".to_string(),
             0x15 => "DEC D".to_string(),
-            0x16 => format!("LD D, {:#X}", imm_byte(bus, pc)),
+            0x16 => format!("LD D, {:#X}", imm_byte(bus, pc, &mut data)),
             0x17 => "RLA".to_string(),
-            0x18 => format!("JR {:#X}", imm_byte(bus, pc)),
+            0x18 => format!("JR {:#X}", imm_byte(bus, pc, &mut data)),
             0x19 => "ADD HL, DE".to_string(),
             0x1A => "LD A (DE)".to_string(),
             0x1B => "DEC DE".to_string(),
             0x1C => "INC E".to_string(),
             0x1D => "DEC E".to_string(),
-            0x1E => format!("LD E, {:#X}", imm_byte(bus, pc)),
+            0x1E => format!("LD E, {:#X}", imm_byte(bus, pc, &mut data)),
             0x1F => "RRA".to_string(),
 
-            0x20 => format!("JR NZ, {:#X}", imm_byte(bus, pc)),
-            0x21 => format!("LD HL, {:#X}", imm_word(bus, pc)),
+            0x20 => format!("JR NZ, {:#X}", imm_byte(bus, pc, &mut data)),
+            0x21 => format!("LD HL, {:#X}", imm_word(bus, pc, &mut data)),
             0x22 => "LD (HL+),A".to_string(),
             0x23 => "INC HL".to_string(),
             0x24 => "INC H".to_string(),
             0x25 => "DEC H".to_string(),
-            0x26 => format!("LD H, {:#X}", imm_byte(bus, pc)),
+            0x26 => format!("LD H, {:#X}", imm_byte(bus, pc, &mut data)),
             0x27 => "DAA".to_string(),
-            0x28 => format!("JR Z, {:#X}", imm_byte(bus, pc)),
+            0x28 => format!("JR Z, {:#X}", imm_byte(bus, pc, &mut data)),
             0x29 => "ADD HL, HL".to_string(),
             0x2A => "LD A (HL+)".to_string(),
             0x2B => "DEC HL".to_string(),
             0x2C => "INC L".to_string(),
             0x2D => "DEC L".to_string(),
-            0x2E => format!("LD L, {:#X}", imm_byte(bus, pc)),
+            0x2E => format!("LD L, {:#X}", imm_byte(bus, pc, &mut data)),
             0x2F => "CPL".to_string(),
 
-            0x30 => format!("JR NC, {:#X}", imm_byte(bus, pc)),
-            0x31 => format!("LD SP, {:#X}", imm_word(bus, pc)),
+            0x30 => format!("JR NC, {:#X}", imm_byte(bus, pc, &mut data)),
+            0x31 => format!("LD SP, {:#X}", imm_word(bus, pc, &mut data)),
             0x32 => "LD (HL-),A".to_string(),
             0x33 => "INC SP".to_string(),
             0x34 => "INC (HL)".to_string(),
             0x35 => "DEC (HL)".to_string(),
-            0x36 => format!("LD (HL), {:#X}", imm_byte(bus, pc)),
+            0x36 => format!("LD (HL), {:#X}", imm_byte(bus, pc, &mut data)),
             0x37 => "SCF".to_string(),
-            0x38 => format!("JR C, {:#X}", imm_byte(bus, pc)),
+            0x38 => format!("JR C, {:#X}", imm_byte(bus, pc, &mut data)),
             0x39 => "ADD HL, SP".to_string(),
             0x3A => "LD A (HL-)".to_string(),
             0x3B => "DEC SP".to_string(),
             0x3C => "INC A".to_string(),
             0x3D => "DEC A".to_string(),
-            0x3E => format!("LD A, {:#X}", imm_byte(bus, pc)),
+            0x3E => format!("LD A, {:#X}", imm_byte(bus, pc, &mut data)),
             0x3F => "CCF".to_string(),
 
             0x40...0x47 => format!("LD B, {}", reg_for_opcode(opcode)),
@@ -102,70 +103,70 @@ pub fn disassemble(bus: &Bus, pc: &mut u16, prefixed: &mut bool) -> String {
 
             0xC0 => "RET NZ".to_string(),
             0xC1 => "POP BC".to_string(),
-            0xC2 => format!("JP NZ, {:#X}", imm_word(bus, pc)),
-            0xC3 => format!("JP {:#X}", imm_word(bus, pc)),
-            0xC4 => format!("CALL NZ, {:#X}", imm_word(bus, pc)),
+            0xC2 => format!("JP NZ, {:#X}", imm_word(bus, pc, &mut data)),
+            0xC3 => format!("JP {:#X}", imm_word(bus, pc, &mut data)),
+            0xC4 => format!("CALL NZ, {:#X}", imm_word(bus, pc, &mut data)),
             0xC5 => "PUSH BC".to_string(),
-            0xC6 => format!("ADD A, {:#X}", imm_byte(bus, pc)),
+            0xC6 => format!("ADD A, {:#X}", imm_byte(bus, pc, &mut data)),
             0xC7 => "RST 0x0".to_string(),
             0xC8 => "RET Z".to_string(),
             0xC9 => "RET".to_string(),
-            0xCA => format!("JP Z, {:#X}", imm_word(bus, pc)),
+            0xCA => format!("JP Z, {:#X}", imm_word(bus, pc, &mut data)),
             0xCB => { *prefixed = true; "PREFIX CB".to_string() },
-            0xCC => format!("CALL Z, {:#X}", imm_word(bus, pc)),
-            0xCD => format!("CALL {:#X}", imm_word(bus, pc)),
-            0xCE => format!("ADC A, {:#X}", imm_byte(bus, pc)),
+            0xCC => format!("CALL Z, {:#X}", imm_word(bus, pc, &mut data)),
+            0xCD => format!("CALL {:#X}", imm_word(bus, pc, &mut data)),
+            0xCE => format!("ADC A, {:#X}", imm_byte(bus, pc, &mut data)),
             0xCF => "RST 0x8".to_string(),
 
             0xD0 => "RET NC".to_string(),
             0xD1 => "POP DE".to_string(),
-            0xD2 => format!("JP NC, {:#X}", imm_word(bus, pc)),
+            0xD2 => format!("JP NC, {:#X}", imm_word(bus, pc, &mut data)),
             0xD3 => "".to_string(),
-            0xD4 => format!("CALL NC, {:#X}", imm_word(bus, pc)),
+            0xD4 => format!("CALL NC, {:#X}", imm_word(bus, pc, &mut data)),
             0xD5 => "PUSH DE".to_string(),
-            0xD6 => format!("SUB {:#X}", imm_byte(bus, pc)),
+            0xD6 => format!("SUB {:#X}", imm_byte(bus, pc, &mut data)),
             0xD7 => "RST 0x10".to_string(),
             0xD8 => "RET C".to_string(),
             0xD9 => "RETI".to_string(),
-            0xDA => format!("JP C, {:#X}", imm_word(bus, pc)),
+            0xDA => format!("JP C, {:#X}", imm_word(bus, pc, &mut data)),
             0xDB => "".to_string(),
-            0xDC => format!("CALL C, {:#X}", imm_word(bus, pc)),
+            0xDC => format!("CALL C, {:#X}", imm_word(bus, pc, &mut data)),
             0xDD => "".to_string(),
-            0xDE => format!("SBC A, {:#X}", imm_byte(bus, pc)),
+            0xDE => format!("SBC A, {:#X}", imm_byte(bus, pc, &mut data)),
             0xDF => "RST 0x18".to_string(),
 
-            0xE0 => format!("LDH ({:#X}), A", imm_byte(bus, pc)),
+            0xE0 => format!("LDH ({:#X}), A", imm_byte(bus, pc, &mut data)),
             0xE1 => "POP HL".to_string(),
             0xE2 => "LD (C), A".to_string(),
             0xE3 => "".to_string(),
             0xE4 => "".to_string(),
             0xE5 => "PUSH HL".to_string(),
-            0xE6 => format!("AND {:#X}", imm_byte(bus, pc)),
+            0xE6 => format!("AND {:#X}", imm_byte(bus, pc, &mut data)),
             0xE7 => "RST 0x20".to_string(),
-            0xE8 => format!("ADD SP, {:#X}", imm_byte(bus, pc)),
+            0xE8 => format!("ADD SP, {:#X}", imm_byte(bus, pc, &mut data)),
             0xE9 => "JP (HL)".to_string(),
-            0xEA => format!("LD ({:#X}), A", imm_word(bus, pc)),
+            0xEA => format!("LD ({:#X}), A", imm_word(bus, pc, &mut data)),
             0xEB => "EI".to_string(),
             0xEC => "".to_string(),
             0xED => "".to_string(),
-            0xEE => format!("XOR {:#X}", imm_byte(bus, pc)),
+            0xEE => format!("XOR {:#X}", imm_byte(bus, pc, &mut data)),
             0xEF => "RST 0x28".to_string(),
 
-            0xF0 => format!("LDH A, ({:#X})", imm_byte(bus, pc)),
+            0xF0 => format!("LDH A, ({:#X})", imm_byte(bus, pc, &mut data)),
             0xF1 => "POP AF".to_string(),
             0xF2 => "LD A, (C)".to_string(),
             0xF3 => "DI".to_string(),
             0xF4 => "".to_string(),
             0xF5 => "PUSH AF".to_string(),
-            0xF6 => format!("OR {:#X}", imm_byte(bus, pc)),
+            0xF6 => format!("OR {:#X}", imm_byte(bus, pc, &mut data)),
             0xF7 => "RST 0x30".to_string(),
-            0xF8 => format!("LD HL, SP+{:#X}", imm_byte(bus, pc)),
+            0xF8 => format!("LD HL, SP+{:#X}", imm_byte(bus, pc, &mut data)),
             0xF9 => "LD SP, HL".to_string(),
-            0xFA => format!("LD A, ({:#X})", imm_word(bus, pc)),
+            0xFA => format!("LD A, ({:#X})", imm_word(bus, pc, &mut data)),
             0xFB => "EI".to_string(),
             0xFC => "".to_string(),
             0xFD => "".to_string(),
-            0xFE => format!("CP {:#X}", imm_byte(bus, pc)),
+            0xFE => format!("CP {:#X}", imm_byte(bus, pc, &mut data)),
             0xFF => "RST 0x38".to_string(),
 
             _ => "".to_string().to_string()
@@ -223,21 +224,27 @@ pub fn disassemble(bus: &Bus, pc: &mut u16, prefixed: &mut bool) -> String {
 
             _ => "".to_string()
         }
-    }
+    };
+
+    (data, instruction)
 }
 
-fn imm_byte(bus: &Bus, pc: &mut u16) -> u8 {
+fn imm_byte(bus: &Bus, pc: &mut u16, data: &mut Vec<u8>) -> u8 {
     let byte = bus.read(*pc);
+    data.push(byte);
     *pc = *pc + 1;
 
     byte
 }
 
-fn imm_word(bus: &Bus, pc: &mut u16) -> u16 {
-    let word = &[bus.read(*pc), bus.read(*pc + 1)];
+fn imm_word(bus: &Bus, pc: &mut u16, data: &mut Vec<u8>) -> u16 {
+    let lb = bus.read(*pc);
+    let hb = bus.read(*pc + 1);
+    data.push(lb);
+    data.push(hb);
     *pc = *pc + 2;
 
-    LittleEndian::read_u16(word)
+    LittleEndian::read_u16(&[lb, hb])
 }
 
 fn reg_for_opcode(opcode: u8) -> &'static str {

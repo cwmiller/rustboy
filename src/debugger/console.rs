@@ -46,9 +46,25 @@ impl Console {
 
         for _ in 0..count {
             let addr = current;
-            let mnemonic = disassemble(bus, &mut current, &mut prefixed);
+            let (data, instruction) = disassemble(bus, &mut current, &mut prefixed);
 
-            println!("{:#X}\t{}", addr, mnemonic);
+            println!("{:X}:\t{}\t\t{}", addr, vec_to_hex_str(data), instruction);
         }
     }
+}
+
+fn vec_to_hex_str(data: Vec<u8>) -> String {
+    let mut res = String::new();
+
+    for byte in &data {
+        let mut hex = format!("{:X}", byte);
+
+        if hex.len() == 1 {
+            hex = "0".to_string() + &hex;
+        }
+
+        res = res + &hex;
+    }
+
+    res
 }
