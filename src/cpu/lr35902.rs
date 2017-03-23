@@ -1,3 +1,4 @@
+/*
 use bus::{Bus, Addressable};
 use byteorder::{ByteOrder, LittleEndian};
 use super::registers::*;
@@ -14,16 +15,14 @@ enum Condition {
 
 pub struct Lr35902 {
     pub regs: Registers,
-    pub bus: Bus,
     ime: bool,
     prefixed: bool
 }
 
 impl Lr35902 {
-    pub fn new(bus: Bus) -> Lr35902 {
+    pub fn new() -> Lr35902 {
         Lr35902 {
             regs: Registers::default(),
-            bus: bus,
             ime: false,
             prefixed: false
         }
@@ -1680,3 +1679,4 @@ impl Lr35902 {
         self.bus.write(addr, val | (1 << bit));
     }
 }
+*/

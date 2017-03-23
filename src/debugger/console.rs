@@ -9,7 +9,7 @@ pub struct Console {
 }
 
 impl Console {
-    pub fn new(gb: Gameboy) -> Console {
+    pub fn new(gb: Gameboy) -> Self {
         Console {
             gb: gb
         }

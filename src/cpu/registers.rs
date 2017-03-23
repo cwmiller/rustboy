@@ -1,15 +1,12 @@
-pub enum Register8 {
+pub enum Register {
     A,
     B,
     C,
     D,
     E,
-    FLAGS,
+    F,
     H,
-    L
-}
-
-pub enum Register16 {
+    L,
     AF,
     BC,
     DE,
@@ -25,99 +22,124 @@ pub const FLAG_C: u8 = 0b00010000;
 
 #[derive(Default)]
 pub struct Registers {
-    pub a: u8,
-    pub b: u8,
-    pub c: u8,
-    pub d: u8,
-    pub e: u8,
-    pub flags: u8,
-    pub h: u8,
-    pub l: u8,
-    pub sp: u16,
-    pub pc: u16
+    af: u16,
+    bc: u16,
+    de: u16,
+    hl: u16,
+    sp: u16,
+    pc: u16
 }
 
 impl Registers {
-    pub fn read_u8(&self, reg: &Register8) -> u8 {
-        use self::Register8::*;
-
-        match *reg {
-            A => self.a,
-            B => self.b,
-            C => self.c,
-            D => self.d,
-            E => self.e,
-            FLAGS => self.flags,
-            H => self.h,
-            L => self.l
-        }
+    pub fn a(&self) -> u8 {
+        (self.af >> 8) as u8
     }
 
-    pub fn write_u8(&mut self, reg: &Register8, val: u8) {
-        use self::Register8::*;
-
-        match *reg {
-            A => self.a = val,
-            B => self.b = val,
-            C => self.c = val,
-            D => self.d = val,
-            E => self.e = val,
-            FLAGS => self.flags = val,
-            H => self.h = val,
-            L => self.l = val
-        }
+    pub fn set_a(&mut self, val: u8) {
+        self.af = self.af | ((val as u16) << 8);
     }
 
-    pub fn read_u16(&self, reg: &Register16) -> u16 {
-        use self::Register16::*;
-
-        match *reg {
-            AF => ((self.a as u16) << 8) | (self.flags as u16),
-            BC => ((self.b as u16) << 8) | (self.c as u16),
-            DE => ((self.d as u16) << 8) | (self.e as u16),
-            HL => ((self.h as u16) << 8) | (self.l as u16),
-            SP => self.sp,
-            PC => self.pc
-        }
+    pub fn b(&self) -> u8 {
+        (self.bc >> 8) as u8
     }
 
-    pub fn write_u16(&mut self, reg: &Register16, val: u16) {
-        use self::Register16::*;
-
-        match *reg {
-            AF => {
-                self.a = (val >> 8) as u8;
-                self.flags = (val & 0x0F) as u8;
-            },
-            BC => {
-                self.b = (val >> 8) as u8;
-                self.c = (val & 0x0F) as u8;
-            },
-            DE => {
-                self.d = (val >> 8) as u8;
-                self.e = (val & 0x0F) as u8;
-            },
-            HL => {
-                self.h = (val >> 8) as u8;
-                self.l = (val & 0x0F) as u8;
-            },
-            SP => self.sp = val,
-            PC => self.pc = val
-        }
+    pub fn set_b(&mut self, val: u8) {
+        self.bc = self.bc | ((val as u16) << 8);
     }
 
-    #[inline(always)]
-    pub fn has_flag(&self, flag: u8) -> bool {
-        self.flags & flag == flag
+    pub fn c(&self) -> u8 {
+        (self.bc & 0xFF) as u8
     }
 
-    #[inline(always)]
-    pub fn set_flag(&mut self, flag: u8) {
-        self.flags = self.flags | flag
+    pub fn set_c(&mut self, val: u8) {
+        self.bc = self.bc | (val as u16) & 0xFF;
     }
 
-    #[inline(always)]
-    pub fn reset_flag(&mut self, flag: u8) {
-        self.flags = self.flags ^ flag
+    pub fn d(&self) -> u8 {
+        (self.de >> 8) as u8
+    }
+
+    pub fn set_d(&mut self, val: u8) {
+        self.de = self.de | ((val as u16) << 8);
+    }
+
+    pub fn e(&self) -> u8 {
+        (self.de & 0xFF) as u8
+    }
+
+    pub fn set_e(&mut self, val: u8) {
+        self.de = self.de | (val as u16) & 0xFF;
+    }
+
+    pub fn f(&self) -> u8 {
+        (self.af & 0xFF) as u8
+    }
+
+    pub fn set_f(&mut self, val: u8) {
+        self.af = self.af | (val as u16) & 0xFF;
+    }
+
+    pub fn h(&self) -> u8 {
+        (self.hl >> 8) as u8
+    }
+
+    pub fn set_h(&mut self, val: u8) {
+        self.hl = self.hl | ((val as u16) << 8);
+    }
+
+    pub fn l(&self) -> u8 {
+        (self.hl & 0xFF) as u8
+    }
+
+    pub fn set_l(&mut self, val: u8) {
+        self.hl = self.hl | (val as u16) & 0xFF;
+    }
+
+    pub fn af(&self) -> u16 {
+        self.af
+    }
+
+    pub fn set_af(&mut self, val: u16) {
+        self.af = val;
+    }
+
+    pub fn bc(&self) -> u16 {
+        self.bc
+    }
+
+    pub fn set_bc(&mut self, val: u16) {
+        self.bc = val;
+    }
+
+    pub fn de(&self) -> u16 {
+        self.de
+    }
+
+    pub fn set_de(&mut self, val: u16) {
+        self.de = val;
+    }
+
+    pub fn hl(&self) -> u16 {
+        self.hl
+    }
+
+    pub fn set_hl(&mut self, val: u16) {
+        self.hl = val;
+    }
+
+    pub fn sp(&self) -> u16 {
+        self.sp
+    }
+
+    pub fn set_sp(&mut self, val: u16) {
+        self.sp = val;
+    }
+    
+    pub fn pc(&self) -> u16 {
+        self.pc
+    }
+
+    pub fn set_pc(&mut self, val: u16) {
+        self.pc = val;
     }
 }

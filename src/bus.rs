@@ -63,7 +63,7 @@ pub struct Bus {
 }
 
 impl Bus {
-    pub fn new(rom: Vec<u8>) -> Bus {
+    pub fn new(rom: Vec<u8>) -> Self {
         Bus {
             cartridge_rom: CartridgeRom::new(rom),
             work_ram: WorkRam::new()
