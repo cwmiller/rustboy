@@ -142,4 +142,8 @@ impl Registers {
     pub fn set_pc(&mut self, val: u16) {
         self.pc = val;
     }
+
+    pub fn has_flag(&mut self, flag: u8) -> bool {
+        (self.f() & flag) == flag
+    }
 }

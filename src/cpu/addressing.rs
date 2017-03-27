@@ -128,7 +128,7 @@ impl AddressingMode<u16> for RegisterAddressing {
     }
 }
 
-pub struct RegisterIndirectAddressing(Register);
+pub struct RegisterIndirectAddressing(pub Register);
 
 impl AddressingMode<u8> for RegisterIndirectAddressing {
     fn read(&self, cpu: &Cpu, bus: &Bus) -> u8 {
