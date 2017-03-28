@@ -148,208 +148,263 @@ impl Cpu {
         let q = (0b00001000 & opcode) >> 3;
 
         match x {
+            // X=0
             0 => match z {
-                0 => self.decode_x_0_z_0(bus, y),
-                1 => self.decode_x_0_z_1(bus, q, p),
-                2 => self.decode_x_0_z_2(bus, q, p),
-                3 => self.decode_x_0_z_3(bus, q, p),
+                // X=0, Z=0
+                0 => {
+                    match y {
+                        // X=0, Z=0, Y=0
+                        // NOP
+                        0 => inst::nop(), 
+                        1 => {
+                            // X=0, Z=0, Y=1
+                            // LD (nn),SP
+                            let dest = ExtendedAddressing(self.next_word(bus));
+                            let src = RegisterAddressing(Register::SP);
+                            inst::ld(self, bus, &dest, &src);
+                        },
+                        2 => { 
+                            // X=0, Z=0, Y=2
+                            // STOP 0
+                            self.next_byte(bus); 
+                            inst::stop();
+                        },
+                        3 => { 
+                            // X=0, Z=0, Y=3
+                            // JR i8
+                            let offset = ImmediateAddressing(self.next_byte(bus));
+                            inst::jr(self, bus, &offset); 
+                        },
+                        4...7 => { 
+                            // X=0, Z=0, Y=4-7
+                            // JR cc, i8
+                            let condition = condition_table(y - 4);
+                            if self.condition_met(condition) {
+                                let offset = ImmediateAddressing(self.next_byte(bus));
+                                inst::jr(self, bus, &offset); 
+                            }
+                        },
+                        _ => unreachable!()
+                    }
+                },
+                // X=0, Z=1
+                1 => {
+                    match q {
+                        0 => {
+                            // X=0, Z=1, Q=0
+                            // LD rr, nn
+                            let register = register_pair_table(p);
+                            let dest = RegisterAddressing(register);
+                            let src = ImmediateAddressing(self.next_word(bus));
+                            inst::ld(self, bus, &dest, &src);
+                        },
+                        1 => {
+                            // X=0, Z=1, Q=1
+                            // ADD HL, rr
+                            let register = register_pair_table(p);
+                            let dest = RegisterAddressing(Register::HL);
+                            let src = RegisterAddressing(register);
+                            inst::add_16(self, bus, &dest, &src);
+                        },
+                        _ => unreachable!()
+                    }
+                },
+                // X=0, Z=2
+                2 => {
+                    match q {
+                        // X=0, Z=2, Q=0
+                        0 => match p {
+                            0 => {
+                                // X=0, Z=2, Q=0, P=0
+                                // LD (BC), A
+                                let dest = RegisterIndirectAddressing(Register::BC);
+                                let src = RegisterAddressing(Register::A);
+                                inst::ld(self, bus, &dest, &src);
+                            },
+                            1 => {
+                                // X=0, Z=2, Q=0, P=1
+                                // LD (DE), A
+                                let dest = RegisterIndirectAddressing(Register::DE);
+                                let src = RegisterAddressing(Register::A);
+                                inst::ld(self, bus, &dest, &src);
+                            },
+                            2 => {
+                                // X=0, Z=2, Q=0, P=2
+                                // LD (nn), HL
+                                let dest = ExtendedAddressing(self.next_word(bus));
+                                let src = RegisterAddressing(Register::HL);
+                                inst::ld(self, bus, &dest, &src);
+                            },
+                            3 => {
+                                // X=0, Z=2, Q=0, P=3
+                                // LD (nn), A
+                                let dest = ExtendedAddressing(self.next_word(bus));
+                                let src = RegisterAddressing(Register::A);
+                                inst::ld(self, bus, &dest, &src);
+                            },
+                            _ => unreachable!()
+                        },
+                        // X=0, Z=2, Q=1
+                        1 => match p {
+                            0 => {
+                                // X=0, Z=2, Q=1, P=0
+                                // LD A, (BC)
+                                let dest = RegisterAddressing(Register::A);
+                                let src = RegisterIndirectAddressing(Register::BC);
+                                inst::ld(self, bus, &dest, &src);
+                            },
+                            1 => {
+                                // X=0, Z=2, Q=1, P=1
+                                // LD A, (DE)
+                                let dest = RegisterAddressing(Register::A);
+                                let src = RegisterIndirectAddressing(Register::DE);
+                                inst::ld(self, bus, &dest, &src);
+                            },
+                            2 => {
+                                // X=0, Z=2, Q=1, P=2
+                                // LD HL, (nn)
+                                let dest = RegisterAddressing(Register::HL);
+                                let src = ExtendedAddressing(self.next_word(bus));
+                                inst::ld(self, bus, &dest, &src);
+                            },
+                            3 => {
+                                // X=0, Z=2, Q=1, P=3
+                                // LD A, (nn)
+                                let dest = RegisterAddressing(Register::A);
+                                let src = ExtendedAddressing(self.next_word(bus));
+                                inst::ld(self, bus, &dest, &src);
+                            },
+                            _ => unreachable!()
+                        },
+                        _ => unreachable!()
+                    }
+                },
+                // X=0, Z=3
+                3 => {
+                    let register = register_pair_table(p);
+                    let dest = RegisterAddressing(register);
+
+                    match q {
+                        // X=0, Z=3, Q=0
+                        // INC rr
+                        0 => inst::inc_16(self, bus, &dest),    
+                        // X=0, Z=3, Q=1
+                        // DEC rr
+                        1 => inst::dec_16(self, bus, &dest),
+                        _ => unreachable!()
+                    }
+                },
+                // X=0, Z=4
+                // INC r
                 4 => {
-                    // INC r
                     let dest = register_addr_table(y);
                     inst::inc_8(self, bus, dest.as_ref());
                 },
+                // X=0, Z=5
+                // DEC r
                 5 => {
-                    // DEC r
                     let dest = register_addr_table(y);
                     inst::dec_8(self, bus, dest.as_ref());
                 },
+                // X=0, Z=6
+                // LD r, n
                 6 => {
-                    // LD r, n
                     let dest = register_addr_table(y);
                     let src = ImmediateAddressing(self.next_byte(bus));
                     inst::ld(self, bus, dest.as_ref(), &src);
                 },
-                7 => self.decode_x_0_z_7(bus, y),
+                // X=0, Z=7
+                7 => {
+                    match y {
+                        // X=0, Z=7, Y=0
+                        // RLCA
+                        0 => inst::rlca(self),  
+                        // X=0, Z=7, Y=1
+                        // RRCA
+                        1 => inst::rrca(self),
+                        // X=0, Z=7, Y=2
+                        // RLA
+                        2 => inst::rla(self),
+                        // X=0, Z=7, Y=3
+                        // RRA
+                        3 => inst::rra(self),
+                        // X=0, Z=7, Y=4
+                        // DAA
+                        4 => inst::daa(self),
+                        // X=0, Z=7, Y=5
+                        // CPL
+                        5 => inst::cpl(self),
+                        // X=0, Z=7, Y=6
+                        // SCF
+                        6 => inst::scf(self),
+                        // X=0, Z=7, Y=7
+                        // CCF
+                        7 => inst::ccf(self),
+                        _ => unreachable!()
+                    }
+                },
                 _ => unreachable!()
             },
+            // X=1
             1 => {
                 if y == 6 {
+                    // X=1, Y=6
                     // HALT
                     inst::halt();
                 } else {
+                    // X=1, Y=1..5,7
                     // LD r, r
                     let dest = register_addr_table(y);
                     let src = register_addr_table(z);
                     inst::ld(self, bus, dest.as_ref(), src.as_ref());
                 }
             },
-            2 => self.decode_x_2(bus, y, z),
-            3 => self.decode_x_3(bus, y, z, q, p),
+            // X=2
+            2 => {
+                let src = register_addr_table(z);
+                match y {
+                    // X=2, Y=0
+                    // ADD A, r
+                    0 => inst::add_8(self, bus, src.as_ref()),
+                    // X=2, Y=1
+                    // ADC A, r
+                    1 => inst::adc(self, bus, src.as_ref()),
+                    // X=2, Y=2
+                    // SUB r    
+                    2 => inst::sub(self, bus, src.as_ref()),
+                    // X=2, Y=3
+                    // SBC A, r
+                    3 => inst::sbc(self, bus, src.as_ref()),
+                    // X=2, Y=4
+                    // AND
+                    4 => inst::and(self, bus, src.as_ref()),
+                    // X=2, Y=5
+                    // XOR
+                    5 => inst::xor(self, bus, src.as_ref()),
+                    // X=2, Y=6
+                    // OR
+                    6 => inst::or(self, bus, src.as_ref()),
+                    // X=2, Y=7
+                    // CP  
+                    7 => inst::cp(self, bus, src.as_ref()),
+                    _ => unreachable!()
+                }
+            },
+            // X=3
+            3 => {
+                match z {
+                    0 => {
+                        // X=3, Z=0
+                        // RET
+                        let condition = condition_table(y);
+                        if self.condition_met(condition) {
+                            inst::ret(self, bus);
+                        }
+                    },
+                    _ => unreachable!()
+                }
+            },
             _ => unreachable!()
         };
-    }
-
-    fn decode_x_0_z_0(&mut self, bus: &mut Bus, y: u8) {
-        match y {
-            0 => inst::nop(), // NOP
-            1 => {
-                // LD (nn),SP
-                let dest = ExtendedAddressing(self.next_word(bus));
-                let src = RegisterAddressing(Register::SP);
-                inst::ld(self, bus, &dest, &src);
-            },
-            2 => { 
-                // STOP 0
-                self.next_byte(bus); 
-                inst::stop();
-            },
-            3 => { 
-                // JR i8
-                let offset = ImmediateAddressing(self.next_byte(bus));
-                inst::jr(self, bus, &offset); 
-            },
-            4...7 => { 
-                // JR cc, i8
-                let condition = condition_table(y - 4);
-                if self.condition_met(condition) {
-                    let offset = ImmediateAddressing(self.next_byte(bus));
-                    inst::jr(self, bus, &offset); 
-                }
-            },
-            _ => unreachable!()
-        }
-    }
-
-    fn decode_x_0_z_1(&mut self, bus: &mut Bus, q: u8, p: u8) {
-        match q {
-            0 => {
-                // LD rr, nn
-                let register = register_pair_table(p);
-                let dest = RegisterAddressing(register);
-                let src = ImmediateAddressing(self.next_word(bus));
-                inst::ld(self, bus, &dest, &src);
-            },
-            1 => {
-                // ADD HL, rr
-                let register = register_pair_table(p);
-                let dest = RegisterAddressing(Register::HL);
-                let src = RegisterAddressing(register);
-                inst::add_16(self, bus, &dest, &src);
-            },
-            _ => unreachable!()
-        }
-    }
-
-    fn decode_x_0_z_2(&mut self, bus: &mut Bus, q: u8, p: u8) {
-        match q {
-            0 => match p {
-                0 => {
-                    // LD (BC), A
-                    let dest = RegisterIndirectAddressing(Register::BC);
-                    let src = RegisterAddressing(Register::A);
-                    inst::ld(self, bus, &dest, &src);
-                },
-                1 => {
-                    // LD (DE), A
-                    let dest = RegisterIndirectAddressing(Register::DE);
-                    let src = RegisterAddressing(Register::A);
-                    inst::ld(self, bus, &dest, &src);
-                },
-                2 => {
-                    // LD (nn), HL
-                    let dest = ExtendedAddressing(self.next_word(bus));
-                    let src = RegisterAddressing(Register::HL);
-                    inst::ld(self, bus, &dest, &src);
-                },
-                3 => {
-                    // LD (nn), A
-                    let dest = ExtendedAddressing(self.next_word(bus));
-                    let src = RegisterAddressing(Register::A);
-                    inst::ld(self, bus, &dest, &src);
-                },
-                _ => unreachable!()
-            },
-            1 => match p {
-                0 => {
-                    // LD A, (BC)
-                    let dest = RegisterAddressing(Register::A);
-                    let src = RegisterIndirectAddressing(Register::BC);
-                    inst::ld(self, bus, &dest, &src);
-                },
-                1 => {
-                    // LD A, (DE)
-                    let dest = RegisterAddressing(Register::A);
-                    let src = RegisterIndirectAddressing(Register::DE);
-                    inst::ld(self, bus, &dest, &src);
-                },
-                2 => {
-                    // LD HL, (nn)
-                    let dest = RegisterAddressing(Register::HL);
-                    let src = ExtendedAddressing(self.next_word(bus));
-                    inst::ld(self, bus, &dest, &src);
-                },
-                3 => {
-                    // LD A, (nn)
-                    let dest = RegisterAddressing(Register::A);
-                    let src = ExtendedAddressing(self.next_word(bus));
-                    inst::ld(self, bus, &dest, &src);
-                },
-                _ => unreachable!()
-            },
-            _ => unreachable!()
-        }
-    }
-
-    fn decode_x_0_z_3(&mut self, bus: &mut Bus, q: u8, p: u8) {
-        let register = register_pair_table(p);
-        let dest = RegisterAddressing(register);
-
-        match q {
-            0 => inst::inc_16(self, bus, &dest),    // INC rr
-            1 => inst::dec_16(self, bus, &dest),    // DEC rr
-            _ => unreachable!()
-        }
-    }
-
-    fn decode_x_0_z_7(&mut self, bus: &mut Bus, y: u8) {
-        match y {
-            0 => inst::rlca(self),  // RLCA
-            1 => inst::rrca(self),  // RRCA
-            2 => inst::rla(self),   // RLA
-            3 => inst::rra(self),   // RRA
-            4 => inst::daa(self),   // DAA
-            5 => inst::cpl(self),   // CPL
-            6 => inst::scf(self),   // SCF
-            7 => inst::ccf(self),   // CCF
-            _ => unreachable!()
-        }
-    }
-
-    fn decode_x_2(&mut self, bus: &mut Bus, y: u8, z: u8) {
-        let src = register_addr_table(z);
-
-        match y {
-            0 => inst::add_8(self, bus, src.as_ref()),  // ADD A, r
-            1 => inst::adc(self, bus, src.as_ref()),    // ADC A, r
-            2 => inst::sub(self, bus, src.as_ref()),    // SUB r
-            3 => inst::sbc(self, bus, src.as_ref()),    // SBC A, r
-            4 => inst::and(self, bus, src.as_ref()),    // AND
-            5 => inst::xor(self, bus, src.as_ref()),    // XOR
-            6 => inst::or(self, bus, src.as_ref()),     // OR
-            7 => inst::cp(self, bus, src.as_ref()),     // CP
-            _ => unreachable!()
-        }
-    }
-
-    fn decode_x_3(&mut self, bus: &mut Bus, y: u8, z: u8, q: u8, p: u8) {
-        match z {
-            0 => {
-                let condition = condition_table(y);
-                if self.condition_met(condition) {
-                    inst::ret(self, bus);
-                }
-            },
-            _ => unreachable!()
-        }
     }
 }
