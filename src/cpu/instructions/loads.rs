@@ -1,5 +1,5 @@
 use bus::Bus;
-use cpu::{AddressingMode, Cpu};
+use super::super::{AddressingMode, Cpu};
 
 // LD
 #[inline(always)]

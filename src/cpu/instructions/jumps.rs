@@ -1,5 +1,5 @@
 use bus::Bus;
-use cpu::{AddressingMode, Condition, Cpu};
+use super::super::{AddressingMode, Condition, Cpu};
 
 // JR
 #[inline(always)]

@@ -1,4 +1,4 @@
-use cpu::Cpu;
+use super::super::Cpu;
 
  // NOP
 #[inline(always)]

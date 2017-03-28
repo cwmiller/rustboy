@@ -1,5 +1,5 @@
 use bus::Bus;
-use cpu::{AddressingMode, Cpu, FLAG_Z, FLAG_C, FLAG_H, FLAG_N};
+use super::super::{AddressingMode, Cpu, FLAG_Z, FLAG_C, FLAG_H, FLAG_N};
 
 // ADD (8bit)
 // Flags affected: Z, N, H, C
