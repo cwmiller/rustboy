@@ -57,6 +57,10 @@ fn register_pair_table(idx: u8) -> Register {
         1 => Register::DE,
         2 => Register::HL,
         3 => Register::SP,
+        4 => Register::BC,
+        5 => Register::DE,
+        6 => Register::HL,
+        7 => Register::AF,
         _ => unreachable!()
     }
 }
@@ -146,6 +150,8 @@ impl Cpu {
         let z = 0b00000111 & opcode;
         let p = y >> 1;
         let q = (0b00001000 & opcode) >> 3;
+
+        println!("{:#X} -> {:#X},{:#X},{:#X},{:#X},{:#X},", opcode, x, y, z, p, q);
 
         match x {
             // X=0
@@ -362,49 +368,155 @@ impl Cpu {
             // X=2
             2 => {
                 let src = register_addr_table(z);
-                match y {
-                    // X=2, Y=0
-                    // ADD A, r
-                    0 => inst::add_8(self, bus, src.as_ref()),
-                    // X=2, Y=1
-                    // ADC A, r
-                    1 => inst::adc(self, bus, src.as_ref()),
-                    // X=2, Y=2
-                    // SUB r    
-                    2 => inst::sub(self, bus, src.as_ref()),
-                    // X=2, Y=3
-                    // SBC A, r
-                    3 => inst::sbc(self, bus, src.as_ref()),
-                    // X=2, Y=4
-                    // AND
-                    4 => inst::and(self, bus, src.as_ref()),
-                    // X=2, Y=5
-                    // XOR
-                    5 => inst::xor(self, bus, src.as_ref()),
-                    // X=2, Y=6
-                    // OR
-                    6 => inst::or(self, bus, src.as_ref()),
-                    // X=2, Y=7
-                    // CP  
-                    7 => inst::cp(self, bus, src.as_ref()),
-                    _ => unreachable!()
-                }
+                self.decode_alu(bus, y, src.as_ref());
             },
             // X=3
             3 => {
                 match z {
+                    // X=3, Z=0
+                    // RET
                     0 => {
-                        // X=3, Z=0
-                        // RET
                         let condition = condition_table(y);
                         if self.condition_met(condition) {
                             inst::ret(self, bus);
                         }
                     },
+                    // X=3, Z=1
+                    1 => {
+                        match q {
+                            // X=3, Z=1, Q=0
+                            // POP rr
+                            0 => {
+                                let register = register_pair_table(p + 4);
+                                let dest = RegisterAddressing(register);
+                                inst::pop(self, bus, &dest);
+                            },
+                            // X=3, Z=1, Q=1
+                            1 => {
+                                match p {
+                                    // X=3, Z=1, Q=1, P=0
+                                    // RET
+                                    0 => inst::ret(self, bus),
+                                    // X=3, Z=1, Q=1, P=1
+                                    // RETI
+                                    1 => inst::reti(self, bus),
+                                    // X=3, Z=1, Q=1, P=2
+                                    // JP (HL)
+                                    2 => {
+                                        // Although this instruction is written as JP (HL), it's not
+                                        // an indirect addressing mode.
+                                        let src = RegisterAddressing(Register::HL);
+                                        inst::jp(self, bus, &src);
+                                    },
+                                    // X=3, Z=1, Q=1, P=3
+                                    // LD SP, HL
+                                    3 => {
+                                        let dest = RegisterAddressing(Register::SP);
+                                        let src = RegisterAddressing(Register::HL);
+                                        inst::ld::<u16>(self, bus, &dest, &src);
+                                    },
+                                    _ => unreachable!()
+                                }
+                            },
+                            _ => unreachable!()
+                        }
+                    },
+                    // X=3, Z=2
+                    // JP cc, nn
+                    2 => {
+                        let condition = condition_table(y);
+                        if self.condition_met(condition) {
+                            let src = ImmediateAddressing(self.next_word(bus));
+                            inst::jp(self, bus, &src);
+                        }
+                    },
+                    // X=3, Z=3
+                    3 => {
+                        match y {
+                            // X=3, Z=3, Y=0
+                            // JP nn
+                            0 => {
+                                let src = ImmediateAddressing(self.next_word(bus));
+                                inst::jp(self, bus, &src);
+                            },
+                            // X=3, Z=3, Y=1
+                            // PREFIX CB
+                            1 => inst::prefix(self),
+                            // X=3, Z=3, Y=2-5
+                            // Exception
+                            2...5 => unimplemented!(),
+                            // X=3, Z=3, Y=6
+                            // DI
+                            6 => inst::di(self),
+                            // X=3, Z=3, Y=7
+                            // EI
+                            7 => inst::ei(self),
+                            _ => unreachable!()
+                        }
+                    },
+                    // X=3, Z=4
+                    // CALL cc, nn
+                    4 => {
+                        let condition = condition_table(y);
+                        if self.condition_met(condition) {
+                            let src = ImmediateAddressing(self.next_word(bus));
+                            inst::call(self, bus, &src);
+                        }
+                    },
+                    // X=3, Z=5
+                    5 => {
+                        match q {
+                            // X=3, Z=5, Q=0
+                            // PUSH rr
+                            0 => {
+                                let register = register_pair_table(p + 4);
+                                let src = RegisterAddressing(register);
+                                inst::push(self, bus, &src);
+                            },
+                            // X=3, Z=5, Q=1
+                            1 => {
+                                match p {
+                                    // X=3, Z=5, Q=1, P=0
+                                    // CALL nn
+                                    0 => {
+                                        let src = ImmediateAddressing(self.next_word(bus));
+                                        inst::call(self, bus, &src);
+                                    },
+                                    // X=3, Z=5, Q=1, P=1-3
+                                    // Exception
+                                    1...3 => unimplemented!(),
+                                    _ => unreachable!()
+                                }
+                            },
+                            _ =>unreachable!()
+                        }
+                    },
+                    // X=3, Z=6
+                    6 => {
+                        let src = ImmediateAddressing(self.next_byte(bus));
+                        self.decode_alu(bus, y, &src);
+                    },
+                    // X=3, Z=7
+                    // RST
+                    7 => inst::rst(self, bus, y * 8),
                     _ => unreachable!()
                 }
             },
             _ => unreachable!()
         };
+    }
+
+    fn decode_alu(&mut self, bus: &mut Bus, y: u8, src: &AddressingMode<u8>) {
+        match y {         
+            0 => inst::add_8(self, bus, src), // ADD A, r           
+            1 => inst::adc(self, bus, src), // ADC A, r   
+            2 => inst::sub(self, bus, src), // SUB r    
+            3 => inst::sbc(self, bus, src), // SBC A, r
+            4 => inst::and(self, bus, src), // AND 
+            5 => inst::xor(self, bus, src), // XOR 
+            6 => inst::or(self, bus, src), // OR
+            7 => inst::cp(self, bus, src), // CP 
+            _ => unreachable!()
+        }
     }
 }
