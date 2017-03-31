@@ -39,6 +39,30 @@ pub fn add_16(cpu: &mut Cpu, bus: &mut Bus, dest: &AddressingMode<u16>, src: &Ad
     cpu.regs.set_f(flags);
 }
 
+// ADD SP, r8
+// Affects flags: Z, N, H, C
+#[inline(always)]
+pub fn add_sp(cpu: &mut Cpu, bus: &mut Bus, src: &AddressingMode<u8>) {
+    let current = cpu.regs.sp();
+    let val = src.read(cpu, bus) as i8;
+    let unsigned = val as u16;
+
+    if val > 0 {
+        cpu.regs.set_sp(current.wrapping_add(unsigned));
+    } else {
+        cpu.regs.set_sp(current.wrapping_sub(val.abs() as u16));
+    }
+
+    // TODO: I don't think this is right
+    let flags =
+        ((((current & 0xF) + (unsigned  & 0xF)) & 0x10) as u8) << 1    // H
+        | if current.wrapping_add(unsigned) < current                  // C
+            { FLAG_C } 
+            else { 0 };
+
+    cpu.regs.set_f(flags);  
+}
+
 // ADC
 // Flags affected: Z, N, H, C
 #[inline(always)]

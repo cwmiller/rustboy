@@ -12,7 +12,7 @@ pub use self::misc::*;
 
 use super::addressing::*;
 use bus::{Addressable, Bus};
-use super::Condition;
+use super::{Condition, Cpu};
 use byteorder::{ByteOrder, LittleEndian};
 use std::fmt;
 use super::registers::Register;
@@ -344,5 +344,42 @@ fn decode_alu(y: u8, src: Box<AddressingMode<u8>>) -> Option<Instruction> {
         6 => Some(Or(src)),
         7 => Some(Cp(src)),
         _ => None
+    }
+}
+
+pub fn execute(cpu: &mut Cpu, bus: &mut Bus, instruction: Instruction) {
+    use self::Instruction::*;
+    match instruction {
+        Nop => nop(),
+        Ld8(dest, src) => ld(cpu, bus, dest.as_ref(), src.as_ref()),
+        Ld16(dest, src) => ld(cpu, bus, dest.as_ref(), src.as_ref()),
+        Stop => stop(),
+        Jr(cond, addr) => jr(cpu, bus, cond, addr.as_ref()),
+        Add16(dest, src) => add_16(cpu, bus, dest.as_ref(), src.as_ref()),
+        Inc8(reg) => inc_8(cpu, bus, reg.as_ref()),
+        Inc16(reg) => inc_16(cpu, bus, reg.as_ref()),
+        Dec8(reg) => dec_8(cpu, bus, reg.as_ref()),
+        Dec16(reg) => dec_16(cpu, bus, reg.as_ref()),
+        Rlca => rlca(cpu),
+        Rrca => rrca(cpu),
+        Rla => rla(cpu),
+        Rra => rra(cpu),
+        Daa => daa(cpu),
+        Cpl => cpl(cpu),
+        Scf => scf(cpu),
+        Ccf => ccf(cpu),
+        Add8(reg) => add_8(cpu, bus, reg.as_ref()),       
+        Adc(reg) => adc(cpu, bus, reg.as_ref()),
+        Sub(reg) => sub(cpu, bus, reg.as_ref()),  
+        Sbc(reg) => sbc(cpu, bus, reg.as_ref()),
+        And(reg) => and(cpu, bus, reg.as_ref()),
+        Xor(reg) => xor(cpu, bus, reg.as_ref()),
+        Or(reg) => or(cpu, bus, reg.as_ref()),
+        Cp(reg) => cp(cpu, bus, reg.as_ref()),
+        Halt => halt(),
+        Ret(cond) => ret(cpu, bus, cond),
+        AddSp(reg) => add_sp(cpu, bus, reg.as_ref()),
+        Ldh(dest, src) => ld(cpu, bus, dest.as_ref(), src.as_ref()),
+        _ => unimplemented!()
     }
 }

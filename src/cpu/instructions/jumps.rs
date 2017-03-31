@@ -3,14 +3,16 @@ use super::super::{AddressingMode, Condition, Cpu};
 
 // JR
 #[inline(always)]
-pub fn jr(cpu: &mut Cpu, bus: &mut Bus, src: &AddressingMode<u8>) {
-    let pc = cpu.regs.pc();
-    let offset = src.read(cpu, bus) as i8;
+pub fn jr(cpu: &mut Cpu, bus: &mut Bus, cond: Condition, src: &AddressingMode<u8>) {
+    if cpu.condition_met(cond) {
+        let pc = cpu.regs.pc();
+        let offset = src.read(cpu, bus) as i8;
 
-    if offset > 0 {
-        cpu.regs.set_pc(pc.wrapping_add(offset as u16));
-    } else {
-        cpu.regs.set_pc(pc.wrapping_sub(offset.abs() as u16));
+        if offset > 0 {
+            cpu.regs.set_pc(pc.wrapping_add(offset as u16));
+        } else {
+            cpu.regs.set_pc(pc.wrapping_sub(offset.abs() as u16));
+        }
     }
 }
 
@@ -33,10 +35,12 @@ pub fn call(cpu: &mut Cpu, bus: &mut Bus, src: &AddressingMode<u16>) {
 
 // RET
 #[inline(always)]
-pub fn ret(cpu: &mut Cpu, bus: &mut Bus) {
-    let addr = cpu.pop_stack(bus);
+pub fn ret(cpu: &mut Cpu, bus: &mut Bus, cond: Condition) {
+    if cpu.condition_met(cond) {
+        let addr = cpu.pop_stack(bus);
 
-    cpu.regs.set_pc(addr);
+        cpu.regs.set_pc(addr);
+    }
 }
 
 // RETI
