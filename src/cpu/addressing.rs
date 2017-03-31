@@ -46,6 +46,29 @@ impl AddressingMode<u8> for ExtendedAddressing {
     }
 }
 
+pub struct IndirectAddressing<T>(pub T);
+
+impl AddressingMode<u8> for IndirectAddressing<u8> {
+    fn read(&self, _: &Cpu, bus: &Bus) -> u8 {
+        bus.read(0xFF00 + self.0 as u16)
+    }
+
+    fn write(&self, _: &mut Cpu, bus: &mut Bus, val: u8) {
+        bus.write(0xFF00 + self.0 as u16, val);
+    }
+}
+
+impl AddressingMode<u8> for IndirectAddressing<u16> {
+    fn read(&self, _: &Cpu, bus: &Bus) -> u8 {
+        bus.read(self.0)
+    }
+
+    fn write(&self, _: &mut Cpu, bus: &mut Bus, val: u8) {
+        bus.write(self.0, val);
+    }
+}
+
+
 pub struct RegisterAddressing(pub Register);
 
 impl AddressingMode<u8> for RegisterAddressing {
