@@ -1,3 +1,5 @@
+use std::fmt;
+
 pub enum Register {
     A,
     B,
@@ -13,6 +15,27 @@ pub enum Register {
     HL,
     SP,
     PC
+}
+
+impl fmt::Display for Register {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        match *self {
+            Register::A => write!(f, "A"),
+            Register::B => write!(f, "B"),
+            Register::C => write!(f, "C"),
+            Register::D => write!(f, "D"),
+            Register::E => write!(f, "E"),
+            Register::F => write!(f, "F"),
+            Register::H => write!(f, "H"),
+            Register::L => write!(f, "L"),
+            Register::AF => write!(f, "AF"),
+            Register::BC => write!(f, "BC"),
+            Register::DE => write!(f, "DE"),
+            Register::HL => write!(f, "HL"),
+            Register::SP => write!(f, "SP"),
+            Register::PC => write!(f, "PC"),
+        }
+    }
 }
 
 pub const FLAG_Z: u8 = 0b10000000;

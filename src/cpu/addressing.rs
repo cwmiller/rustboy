@@ -1,8 +1,9 @@
 use super::Cpu;
 use bus::{Addressable, Bus};
 use super::registers::Register;
+use std::fmt;
 
-pub trait AddressingMode<T> {
+pub trait AddressingMode<T> : fmt::Display {
     fn read(&self, cpu: &Cpu, bus: &Bus) -> T;
 
     fn write(&self, cpu: &mut Cpu, bus: &mut Bus, val: T);
@@ -10,13 +11,19 @@ pub trait AddressingMode<T> {
 
 pub struct ImmediateAddressing<T>(pub T);
 
-impl<T> AddressingMode<T> for ImmediateAddressing<T> where T : Copy {
+impl<T> AddressingMode<T> for ImmediateAddressing<T> where T : Copy + fmt::UpperHex {
     fn read(&self, _: &Cpu, _: &Bus) -> T {
         self.0
     }
 
     fn write(&self, _: &mut Cpu, _: &mut Bus, _: T) {
         panic!("Write not supported for immediate addressing.");
+    }
+}
+
+impl<T> fmt::Display for ImmediateAddressing<T> where T : fmt::UpperHex {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        write!(f, "{:#X}", self.0)
     }
 }
 
@@ -34,6 +41,12 @@ impl AddressingMode<u8> for RelativeAddressing {
     }
 }
 
+impl fmt::Display for RelativeAddressing {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        write!(f, "{:#X}", self.0)
+    }
+}
+
 pub struct ExtendedAddressing(pub u16);
 
 impl AddressingMode<u8> for ExtendedAddressing {
@@ -45,6 +58,13 @@ impl AddressingMode<u8> for ExtendedAddressing {
         bus.write(self.0, val);
     }
 }
+
+impl fmt::Display for ExtendedAddressing {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        write!(f, "{:#X}", self.0)
+    }
+}
+
 
 pub struct IndirectAddressing<T>(pub T);
 
@@ -68,6 +88,11 @@ impl AddressingMode<u8> for IndirectAddressing<u16> {
     }
 }
 
+impl<T> fmt::Display for IndirectAddressing<T> where T : fmt::UpperHex {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        write!(f, "({:#X})", self.0)
+    }
+}
 
 pub struct RegisterAddressing(pub Register);
 
@@ -151,6 +176,12 @@ impl AddressingMode<u16> for RegisterAddressing {
     }
 }
 
+impl fmt::Display for RegisterAddressing {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        write!(f, "{}", self.0)
+    }
+}
+
 pub struct RegisterIndirectAddressing(pub Register);
 
 impl AddressingMode<u8> for RegisterIndirectAddressing {
@@ -162,6 +193,12 @@ impl AddressingMode<u8> for RegisterIndirectAddressing {
     fn write(&self, cpu: &mut Cpu, bus: &mut Bus, val: u8) {
         let addr = register_indirect_addr(cpu, &self.0);
         bus.write(addr, val)
+    }
+}
+
+impl fmt::Display for RegisterIndirectAddressing {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        write!(f, "({})", self.0)
     }
 }
 
