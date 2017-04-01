@@ -18,19 +18,23 @@ pub fn jr(cpu: &mut Cpu, bus: &mut Bus, cond: Condition, src: &AddressingMode<u8
 
 // JP
 #[inline(always)]
-pub fn jp(cpu: &mut Cpu, bus: &mut Bus, src: &AddressingMode<u16>) {
-    let addr = src.read(cpu, bus);
-    cpu.regs.set_pc(addr);
+pub fn jp(cpu: &mut Cpu, bus: &mut Bus, cond: Condition, src: &AddressingMode<u16>) {
+    if cpu.condition_met(cond) {
+        let addr = src.read(cpu, bus);
+        cpu.regs.set_pc(addr);
+    }
 }
 
 // CALL
 #[inline(always)]
-pub fn call(cpu: &mut Cpu, bus: &mut Bus, src: &AddressingMode<u16>) {
-    let addr = cpu.next_word(bus);
-    let pc = cpu.regs.pc();
-    
-    cpu.push_stack(bus, pc);
-    cpu.regs.set_pc(addr);
+pub fn call(cpu: &mut Cpu, bus: &mut Bus, cond: Condition, src: &AddressingMode<u16>) {
+    if cpu.condition_met(cond) {
+        let addr = src.read(cpu, bus);
+        let pc = cpu.regs.pc();
+        
+        cpu.push_stack(bus, pc);
+        cpu.regs.set_pc(addr);
+    }
 }
 
 // RET
@@ -53,8 +57,8 @@ pub fn reti(cpu: &mut Cpu, bus: &mut Bus) {
 
 // RST
 #[inline(always)]
-pub fn rst(cpu: &mut Cpu, bus: &mut Bus, addr: u8) {
+pub fn rst(cpu: &mut Cpu, bus: &mut Bus, index: u8) {
     let pc = cpu.regs.pc();
     cpu.push_stack(bus, pc);
-    cpu.regs.set_pc(addr as u16);
+    cpu.regs.set_pc((index * 8) as u16);
 }

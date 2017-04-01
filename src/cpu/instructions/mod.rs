@@ -36,6 +36,8 @@ pub enum Instruction {
     Cpl,
     Scf,
     Ccf,
+    Ldd(Box<AddressingMode<u8>>, Box<AddressingMode<u8>>),
+    Ldi(Box<AddressingMode<u8>>, Box<AddressingMode<u8>>),
     Add8(Box<AddressingMode<u8>>),       
     Adc(Box<AddressingMode<u8>>),
     Sub(Box<AddressingMode<u8>>),  
@@ -94,6 +96,8 @@ impl fmt::Display for Instruction {
             Cpl => write!(f, "CPL"),
             Scf => write!(f, "SCF"),
             Ccf => write!(f, "CCF"),
+            Ldd(ref dest, ref src) => write!(f, "LDD {}, {}", dest, src),
+            Ldi(ref dest, ref src) => write!(f, "LDI {}, {}", dest, src),
             Add8(ref reg) => write!(f, "ADD A, {}", reg),
             Adc(ref reg) => write!(f, "ADC A, {}", reg),
             Sub(ref reg) => write!(f, "SUB {}", reg), 
@@ -170,10 +174,6 @@ fn imm16(bus: &Bus, mut pc: &mut u16) -> Box<ImmediateAddressing<u16>> {
     Box::new(ImmediateAddressing(step_word(bus, &mut pc)))
 }
 
-fn rel(bus: &Bus, mut pc: &mut u16) -> Box<RelativeAddressing> {
-    Box::new(RelativeAddressing(step_byte(bus, &mut pc) as i8))
-}
-
 fn ind8(bus: &Bus, mut pc: &mut u16) -> Box<IndirectAddressing<u8>> {
     Box::new(IndirectAddressing(step_byte(bus, &mut pc)))
 }
@@ -242,12 +242,12 @@ pub fn decode(bus: &Bus, mut pc: u16, prefixed: bool) -> (u8, Option<Instruction
                 // X=0, Z=2
                 (0, _, 2, 0, 0) => Some(Ld8(regind(BC), reg(A))),
                 (0, _, 2, 0, 1) => Some(Ld8(regind(DE), reg(A))),
-                (0, _, 2, 0, 2) => Some(Ld8(ext(bus, &mut pc), reg(HL))),
-                (0, _, 2, 0, 3) => Some(Ld8(ext(bus, &mut pc), reg(A))),
+                (0, _, 2, 0, 2) => Some(Ldi(regind(HL), reg(A))),
+                (0, _, 2, 0, 3) => Some(Ldd(regind(HL), reg(A))),
                 (0, _, 2, 1, 0) => Some(Ld8(reg(A), regind(BC))),
                 (0, _, 2, 1, 1) => Some(Ld8(reg(A), regind(DE))),
-                (0, _, 2, 1, 2) => Some(Ld8(reg(HL), ext(bus, &mut pc))),
-                (0, _, 2, 1, 3) => Some(Ld8(reg(A), ext(bus, &mut pc))),
+                (0, _, 2, 1, 2) => Some(Ldi(reg(A), regind(HL))),
+                (0, _, 2, 1, 3) => Some(Ldd(reg(A), regind(HL))),
                 // X=0, Z=3
                 (0, _, 3, 0, _) => Some(Inc16(reg(reg_pair_table(p)))),
                 (0, _, 3, 1, _) => Some(Dec16(reg(reg_pair_table(p)))),
@@ -368,6 +368,8 @@ pub fn execute(cpu: &mut Cpu, bus: &mut Bus, instruction: Instruction) {
         Cpl => cpl(cpu),
         Scf => scf(cpu),
         Ccf => ccf(cpu),
+        Ldd(dest, src) => ldd(cpu, bus, dest.as_ref(), src.as_ref()),
+        Ldi(dest, src) => ldi(cpu, bus, dest.as_ref(), src.as_ref()),
         Add8(reg) => add_8(cpu, bus, reg.as_ref()),       
         Adc(reg) => adc(cpu, bus, reg.as_ref()),
         Sub(reg) => sub(cpu, bus, reg.as_ref()),  
@@ -380,6 +382,26 @@ pub fn execute(cpu: &mut Cpu, bus: &mut Bus, instruction: Instruction) {
         Ret(cond) => ret(cpu, bus, cond),
         AddSp(reg) => add_sp(cpu, bus, reg.as_ref()),
         Ldh(dest, src) => ld(cpu, bus, dest.as_ref(), src.as_ref()),
-        _ => unimplemented!()
+        Ldhl(offset) => ldhl(cpu, bus, offset.as_ref()),
+        Pop(reg) => pop(cpu, bus, reg.as_ref()),
+        Reti => reti(cpu, bus),
+        Jp(cond, addr) => jp(cpu, bus, cond, addr.as_ref()),
+        Di => di(cpu),
+        Ei => ei(cpu),
+        Prefix => prefix(cpu),
+        Call(cond, addr) => call(cpu, bus, cond, addr.as_ref()),
+        Push(reg) => push(cpu, bus, reg.as_ref()),
+        Rst(index) => rst(cpu, bus, index),
+        Rlc(reg) => rlc(cpu, bus, reg.as_ref()),
+        Rrc(reg) => rrc(cpu, bus, reg.as_ref()),
+        Rl(reg) => rl(cpu, bus, reg.as_ref()),
+        Rr(reg) => rr(cpu, bus, reg.as_ref()),
+        Sla(reg) => sla(cpu, bus, reg.as_ref()),
+        Sra(reg) => sra(cpu, bus, reg.as_ref()),
+        Swap(reg) => swap(cpu, bus, reg.as_ref()),
+        Srl(reg) => srl(cpu, bus, reg.as_ref()),
+        Bit(b, reg) => bit(cpu, bus, b, reg.as_ref()),
+        Res(bit, reg) => res(cpu, bus, bit, reg.as_ref()),
+        Set(bit, reg) => set(cpu, bus, bit, reg.as_ref())
     }
 }

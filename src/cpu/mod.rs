@@ -57,10 +57,13 @@ impl Cpu {
 
     pub fn step(&mut self, bus: &mut Bus) -> usize {
         let pc = self.regs.pc();
-        let (opcode, instruction, length) = inst::decode(bus, pc, self.prefixed);
+        let (opcode, decoded, length) = inst::decode(bus, pc, self.prefixed);
 
-        if instruction.is_some() {
-            inst::execute(self, bus, instruction.unwrap());
+        if decoded.is_some() {
+            let instruction = decoded.unwrap();
+
+            println!("{:#X}: {}", opcode, instruction);
+            inst::execute(self, bus, instruction);
         }
 
         self.regs.set_pc(pc + length);

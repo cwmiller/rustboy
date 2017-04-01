@@ -27,26 +27,6 @@ impl<T> fmt::Display for ImmediateAddressing<T> where T : fmt::UpperHex {
     }
 }
 
-pub struct RelativeAddressing(pub i8);
-
-impl AddressingMode<u8> for RelativeAddressing {
-    fn read(&self, cpu: &Cpu, bus: &Bus) -> u8 {
-        let addr = cpu.regs.pc().wrapping_add(self.0 as u16);
-        bus.read(addr)
-    }
-
-    fn write(&self, cpu: &mut Cpu, bus: &mut Bus, val: u8) {
-        let addr = cpu.regs.pc().wrapping_add(self.0 as u16);
-        bus.write(addr, val);
-    }
-}
-
-impl fmt::Display for RelativeAddressing {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        write!(f, "{:#X}", self.0)
-    }
-}
-
 pub struct ExtendedAddressing(pub u16);
 
 impl AddressingMode<u8> for ExtendedAddressing {
