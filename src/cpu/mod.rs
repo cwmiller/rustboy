@@ -57,33 +57,30 @@ impl Cpu {
 
     pub fn step(&mut self, bus: &mut Bus) -> usize {
         let pc = self.regs.pc();
-        let (opcode, decoded, length) = inst::decode(bus, pc, self.prefixed);
+        let opcode = bus.read(pc);
+        let mut length = 1;
+        let decoded_instruction;
 
-        if decoded.is_some() {
-            let instruction = decoded.unwrap();
+        {
+            let mut imm8 = || { 
+                let byte = bus.read(pc.wrapping_add(length));
+                length = length + 1; 
+                byte
+            };
 
-            println!("{:#X}: {}", opcode, instruction);
-            inst::execute(self, bus, instruction);
+            decoded_instruction = inst::decode(opcode, self.prefixed, &mut imm8);
         }
 
         self.regs.set_pc(pc + length);
 
+        if decoded_instruction.is_some() {
+            let instruction = decoded_instruction.unwrap();
+
+            println!("{:#X}: {}", pc, instruction);
+            inst::execute(self, bus, instruction);
+        }
+
         0
-    }
-
-    fn next_byte(&mut self, bus: &Bus) -> u8 {
-        let pc = self.regs.pc();
-        let byte = bus.read(pc);
-        self.regs.set_pc(pc.wrapping_add(1));
-
-        byte
-    }
-
-    fn next_word(&mut self, bus: &Bus) -> u16 {
-        let lb = self.next_byte(bus);
-        let hb = self.next_byte(bus);
-
-        LittleEndian::read_u16(&[lb, hb])
     }
 
     fn pop_stack(&mut self, bus: &Bus) -> u16 {

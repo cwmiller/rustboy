@@ -10,9 +10,9 @@ pub use self::loads::*;
 pub use self::math::*;
 pub use self::misc::*;
 
-use super::addressing::*;
-use bus::{Addressable, Bus};
 use super::{Condition, Cpu};
+use super::addressing::*;
+use bus::Bus;
 use byteorder::{ByteOrder, LittleEndian};
 use std::fmt;
 use super::registers::Register;
@@ -135,19 +135,6 @@ impl fmt::Display for Instruction {
     }
 }
 
-fn step_byte(bus: &Bus, mut pc: &mut u16) -> u8 {
-    let byte = bus.read(*pc);
-    *pc = *pc + 1;
-    byte
-}
-
-fn step_word(bus: &Bus, mut pc: &mut u16) -> u16 {
-    let lb = step_byte(bus, &mut pc);
-    let hb = step_byte(bus, &mut pc);
-
-    LittleEndian::read_u16(&[lb, hb])
-}
-
 fn cond_table(idx: u8) -> Condition {
     match idx {
         0 => Condition::Nz,
@@ -158,32 +145,32 @@ fn cond_table(idx: u8) -> Condition {
     }
 }
 
-fn reg(reg: Register) -> Box<RegisterAddressing> {
+fn reg_addr(reg: Register) -> Box<RegisterAddressing> {
     Box::new(RegisterAddressing(reg))
 }
 
-fn regind(reg: Register) -> Box<RegisterIndirectAddressing> {
+fn regind_addr(reg: Register) -> Box<RegisterIndirectAddressing> {
     Box::new(RegisterIndirectAddressing(reg))
 }
 
-fn imm8(bus: &Bus, mut pc: &mut u16) -> Box<ImmediateAddressing<u8>> {
-    Box::new(ImmediateAddressing(step_byte(bus, &mut pc)))
+fn imm8_addr(byte: u8) -> Box<ImmediateAddressing<u8>> {
+    Box::new(ImmediateAddressing(byte))
 }
 
-fn imm16(bus: &Bus, mut pc: &mut u16) -> Box<ImmediateAddressing<u16>> {
-    Box::new(ImmediateAddressing(step_word(bus, &mut pc)))
+fn imm16_addr(word: u16) -> Box<ImmediateAddressing<u16>> {
+    Box::new(ImmediateAddressing(word))
 }
 
-fn ind8(bus: &Bus, mut pc: &mut u16) -> Box<IndirectAddressing<u8>> {
-    Box::new(IndirectAddressing(step_byte(bus, &mut pc)))
+fn ind8_addr(byte: u8) -> Box<IndirectAddressing<u8>> {
+    Box::new(IndirectAddressing(byte))
 }
 
-fn ind16(bus: &Bus, mut pc: &mut u16) -> Box<IndirectAddressing<u16>> {
-    Box::new(IndirectAddressing(step_word(bus, &mut pc)))
+fn ind16_addr(word: u16) -> Box<IndirectAddressing<u16>> {
+    Box::new(IndirectAddressing(word))
 }
 
-fn ext(bus: &Bus, mut pc: &mut u16) -> Box<ExtendedAddressing> {
-    Box::new(ExtendedAddressing(step_word(bus, pc)))
+fn ext_addr(word: u16) -> Box<ExtendedAddressing> {
+    Box::new(ExtendedAddressing(word))
 }
 
 fn reg_addr_table(idx: u8) -> Box<AddressingMode<u8>> {
@@ -214,12 +201,9 @@ fn reg_pair_table(idx: u8) -> Register {
     }
 }
 
-pub fn decode(bus: &Bus, mut pc: u16, prefixed: bool) -> (u8, Option<Instruction>, u16) {
+pub fn decode(opcode: u8, prefixed: bool, mut next: &mut FnMut() -> u8) -> Option<Instruction> {
     use self::Register::*;
     use self::Instruction::*;
-
-    let start_pc = pc;
-    let opcode = step_byte(bus, &mut pc);
 
     let x = (0b11000000 & opcode) >> 6;
     let y = (0b00111000 & opcode) >> 3;
@@ -227,36 +211,43 @@ pub fn decode(bus: &Bus, mut pc: u16, prefixed: bool) -> (u8, Option<Instruction
     let p = y >> 1;
     let q = (0b00001000 & opcode) >> 3;
 
+    let next16 = |n: &mut FnMut() -> u8| -> u16 {
+        let lb = n();
+        let hb = n();
+
+        LittleEndian::read_u16(&[lb, hb])
+    };
+
     let instruction = 
         if !prefixed {
             match (x, y, z, q, p) {
                 // X=0, Z=0
                 (0, 0, 0, _, _) => Some(Nop),
-                (0, 1, 0, _, _) => Some(Ld8(ext(bus, &mut pc), reg(SP))),
-                (0, 2, 0, _, _) => { step_word(bus, &mut pc); Some(Stop) },
-                (0, 3, 0, _, _) => Some(Jr(Condition::None, imm8(bus, &mut pc))),
-                (0, 4...7, 0, _, _) => Some(Jr(cond_table(y-4), imm8(bus, &mut pc))),
+                (0, 1, 0, _, _) => Some(Ld8(ext_addr(next16(&mut next)), reg_addr(SP))),
+                (0, 2, 0, _, _) => { next16(&mut next); Some(Stop) },
+                (0, 3, 0, _, _) => Some(Jr(Condition::None, imm8_addr(next()))),
+                (0, 4...7, 0, _, _) => Some(Jr(cond_table(y-4), imm8_addr(next()))),
                 // X=0, Z=1
-                (0, _, 1, 0, _) => Some(Ld16(reg(reg_pair_table(p)), imm16(bus, &mut pc))),
-                (0, _, 1, 1, _) => Some(Add16(reg(HL), reg(reg_pair_table(p)))),
+                (0, _, 1, 0, _) => Some(Ld16(reg_addr(reg_pair_table(p)), imm16_addr(next16(&mut next)))),
+                (0, _, 1, 1, _) => Some(Add16(reg_addr(HL), reg_addr(reg_pair_table(p)))),
                 // X=0, Z=2
-                (0, _, 2, 0, 0) => Some(Ld8(regind(BC), reg(A))),
-                (0, _, 2, 0, 1) => Some(Ld8(regind(DE), reg(A))),
-                (0, _, 2, 0, 2) => Some(Ldi(regind(HL), reg(A))),
-                (0, _, 2, 0, 3) => Some(Ldd(regind(HL), reg(A))),
-                (0, _, 2, 1, 0) => Some(Ld8(reg(A), regind(BC))),
-                (0, _, 2, 1, 1) => Some(Ld8(reg(A), regind(DE))),
-                (0, _, 2, 1, 2) => Some(Ldi(reg(A), regind(HL))),
-                (0, _, 2, 1, 3) => Some(Ldd(reg(A), regind(HL))),
+                (0, _, 2, 0, 0) => Some(Ld8(regind_addr(BC), reg_addr(A))),
+                (0, _, 2, 0, 1) => Some(Ld8(regind_addr(DE), reg_addr(A))),
+                (0, _, 2, 0, 2) => Some(Ldi(regind_addr(HL), reg_addr(A))),
+                (0, _, 2, 0, 3) => Some(Ldd(regind_addr(HL), reg_addr(A))),
+                (0, _, 2, 1, 0) => Some(Ld8(reg_addr(A), regind_addr(BC))),
+                (0, _, 2, 1, 1) => Some(Ld8(reg_addr(A), regind_addr(DE))),
+                (0, _, 2, 1, 2) => Some(Ldi(reg_addr(A), regind_addr(HL))),
+                (0, _, 2, 1, 3) => Some(Ldd(reg_addr(A), regind_addr(HL))),
                 // X=0, Z=3
-                (0, _, 3, 0, _) => Some(Inc16(reg(reg_pair_table(p)))),
-                (0, _, 3, 1, _) => Some(Dec16(reg(reg_pair_table(p)))),
+                (0, _, 3, 0, _) => Some(Inc16(reg_addr(reg_pair_table(p)))),
+                (0, _, 3, 1, _) => Some(Dec16(reg_addr(reg_pair_table(p)))),
                 // X=0, Z=4
                 (0, _, 4, _, _) => Some(Inc8(reg_addr_table(p))),
                 // X=0, Z=5
                 (0, _, 5, _, _) => Some(Dec8(reg_addr_table(p))),
                 // X=0, Z=6
-                (0, _, 6, _, _) => Some(Ld8(reg_addr_table(y), imm8(bus, &mut pc))),
+                (0, _, 6, _, _) => Some(Ld8(reg_addr_table(y), imm8_addr(next()))),
                 // X=0, Z=7
                 (0, 0, 7, _, _) => Some(Rlca),
                 (0, 1, 7, _, _) => Some(Rrca),
@@ -273,32 +264,32 @@ pub fn decode(bus: &Bus, mut pc: u16, prefixed: bool) -> (u8, Option<Instruction
                 (2, _, _, _, _) => decode_alu(y, reg_addr_table(z)),
                 // X=3, Z=0
                 (3, 0...3, 0, _, _) => Some(Ret(cond_table(y))),
-                (3, 4, 0, _, _) => Some(Ldh(ind8(bus, &mut pc), reg(A))),
-                (3, 5, 0, _, _) => Some(AddSp(imm8(bus, &mut pc))),
-                (3, 6, 0, _, _) => Some(Ldh(reg(A), ind8(bus, &mut pc))),
-                (3, 7, 0, _, _) => Some(Ldhl(imm8(bus, &mut pc))),
+                (3, 4, 0, _, _) => Some(Ldh(ind8_addr(next()), reg_addr(A))),
+                (3, 5, 0, _, _) => Some(AddSp(imm8_addr(next()))),
+                (3, 6, 0, _, _) => Some(Ldh(reg_addr(A), ind8_addr(next()))),
+                (3, 7, 0, _, _) => Some(Ldhl(imm8_addr(next()))),
                 // X=3, Z=1
-                (3, _, 1, 0, _) => Some(Pop(reg(reg_pair_table(p + 4)))),
+                (3, _, 1, 0, _) => Some(Pop(reg_addr(reg_pair_table(p + 4)))),
                 (3, _, 1, 1, 0) => Some(Ret(Condition::None)),
                 (3, _, 1, 1, 1) => Some(Reti),
-                (3, _, 1, 1, 2) => Some(Jp(Condition::None, reg(HL))),
-                (3, _, 1, 1, 3) => Some(Ld16(reg(SP), reg(HL))),
+                (3, _, 1, 1, 2) => Some(Jp(Condition::None, reg_addr(HL))),
+                (3, _, 1, 1, 3) => Some(Ld16(reg_addr(SP), reg_addr(HL))),
                 // X=3, Z=2
-                (3, 0...3, 2, _, _) => Some(Jp(cond_table(y), imm16(bus, &mut pc))),
-                (3, 4, 2, _, _) => Some(Ld8(regind(C), reg(A))),
-                (3, 5, 2, _, _) => Some(Ld8(ind16(bus, &mut pc), reg(A))),
-                (3, 6, 2, _, _) => Some(Ld8(reg(A), regind(C))),
-                (3, 7, 2, _, _) => Some(Ld8(reg(A), ind16(bus, &mut pc))),
+                (3, 0...3, 2, _, _) => Some(Jp(cond_table(y), imm16_addr(next16(&mut next)))),
+                (3, 4, 2, _, _) => Some(Ld8(regind_addr(C), reg_addr(A))),
+                (3, 5, 2, _, _) => Some(Ld8(ind16_addr(next16(&mut next)), reg_addr(A))),
+                (3, 6, 2, _, _) => Some(Ld8(reg_addr(A), regind_addr(C))),
+                (3, 7, 2, _, _) => Some(Ld8(reg_addr(A), ind16_addr(next16(&mut next)))),
                 // X=3, Z=3
-                (3, 0, 3, _, _) => Some(Jp(Condition::None, imm16(bus, &mut pc))),
+                (3, 0, 3, _, _) => Some(Jp(Condition::None, imm16_addr(next16(&mut next)))),
                 (3, 1, 3, _, _) => Some(Prefix),
                 (3, 6, 3, _, _) => Some(Di),
                 (3, 7, 3, _, _) => Some(Ei),
                 // X=3, Z=4
-                (3, 0...3, 4, _, _) => Some(Call(cond_table(y), imm16(bus, &mut pc))),
+                (3, 0...3, 4, _, _) => Some(Call(cond_table(y), imm16_addr(next16(&mut next)))),
                 // X=3, Z=5
-                (3, 7, 5, 0, _) => Some(Push(reg(reg_pair_table(p + 4)))),
-                (3, 7, 5, 1, 0) => Some(Call(Condition::None, imm16(bus, &mut pc))),
+                (3, 7, 5, 0, _) => Some(Push(reg_addr(reg_pair_table(p + 4)))),
+                (3, 7, 5, 1, 0) => Some(Call(Condition::None, imm16_addr(next16(&mut next)))),
                 // X=3, Z=6
                 (3, _, 6, _, _) => decode_alu(y, reg_addr_table(z)),
                 // X=3, Z=7
@@ -328,7 +319,7 @@ pub fn decode(bus: &Bus, mut pc: u16, prefixed: bool) -> (u8, Option<Instruction
             }
         };
 
-    (opcode, instruction, pc - start_pc)
+    instruction
 }
 
 fn decode_alu(y: u8, src: Box<AddressingMode<u8>>) -> Option<Instruction> {
