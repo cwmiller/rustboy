@@ -288,10 +288,10 @@ pub fn decode(opcode: u8, prefixed: bool, mut next: &mut FnMut() -> u8) -> Optio
                 // X=3, Z=4
                 (3, 0...3, 4, _, _) => Some(Call(cond_table(y), imm16_addr(next16(&mut next)))),
                 // X=3, Z=5
-                (3, 7, 5, 0, _) => Some(Push(reg_addr(reg_pair_table(p + 4)))),
-                (3, 7, 5, 1, 0) => Some(Call(Condition::None, imm16_addr(next16(&mut next)))),
+                (3, _, 5, 0, _) => Some(Push(reg_addr(reg_pair_table(p + 4)))),
+                (3, _, 5, 1, 0) => Some(Call(Condition::None, imm16_addr(next16(&mut next)))),
                 // X=3, Z=6
-                (3, _, 6, _, _) => decode_alu(y, reg_addr_table(z)),
+                (3, _, 6, _, _) => decode_alu(y, imm8_addr(next())),
                 // X=3, Z=7
                 (3, _, 7, _, _) => Some(Rst(y)),
                 _ => None
