@@ -29,7 +29,6 @@ fn parse_str(val: &str) -> usize {
 
 impl Command {
     pub fn parse(line: &String, pc: u16) -> Result<Self, String> {
-    
         match line.chars().nth(0).unwrap() {
             'c' => Ok(Command::Continue),
             'q' => Ok(Command::Quit),

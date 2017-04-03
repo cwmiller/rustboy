@@ -67,7 +67,7 @@ impl Registers {
     }
 
     pub fn set_b(&mut self, val: u8) {
-        self.bc = self.bc | ((val as u16) << 8);
+        self.bc = (self.bc & 0x00FF) | ((val as u16) << 8);
     }
 
     pub fn c(&self) -> u8 {
@@ -75,7 +75,7 @@ impl Registers {
     }
 
     pub fn set_c(&mut self, val: u8) {
-        self.bc = self.bc | (val as u16) & 0xFF;
+        self.bc = (self.bc & 0xFF) | (val as u16) & 0xFF;
     }
 
     pub fn d(&self) -> u8 {
@@ -83,7 +83,7 @@ impl Registers {
     }
 
     pub fn set_d(&mut self, val: u8) {
-        self.de = self.de | ((val as u16) << 8);
+        self.de = (self.de & 0x00FF) | ((val as u16) << 8);
     }
 
     pub fn e(&self) -> u8 {
@@ -91,7 +91,7 @@ impl Registers {
     }
 
     pub fn set_e(&mut self, val: u8) {
-        self.de = self.de | (val as u16) & 0xFF;
+        self.de = self.de & 0xFF00 | (val as u16) & 0xFF;
     }
 
     pub fn f(&self) -> u8 {
@@ -99,7 +99,7 @@ impl Registers {
     }
 
     pub fn set_f(&mut self, val: u8) {
-        self.af = self.af | (val as u16) & 0xFF;
+        self.af = (self.af & 0xFF00) | (val as u16) & 0xFF;
     }
 
     pub fn h(&self) -> u8 {
@@ -107,7 +107,7 @@ impl Registers {
     }
 
     pub fn set_h(&mut self, val: u8) {
-        self.hl = self.hl | ((val as u16) << 8);
+        self.hl = (self.hl & 0x00FF) | ((val as u16) << 8);
     }
 
     pub fn l(&self) -> u8 {
@@ -115,7 +115,7 @@ impl Registers {
     }
 
     pub fn set_l(&mut self, val: u8) {
-        self.hl = self.hl | (val as u16) & 0xFF;
+        self.hl = (self.hl & 0xFF00) | (val as u16) & 0xFF;
     }
 
     pub fn af(&self) -> u16 {
@@ -166,7 +166,25 @@ impl Registers {
         self.pc = val;
     }
 
-    pub fn has_flag(&mut self, flag: u8) -> bool {
+    pub fn has_flag(&self, flag: u8) -> bool {
         (self.f() & flag) == flag
+    }
+}
+
+impl fmt::Debug for Registers {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        try!(writeln!(f, "A : {:#04X}\tF : {:#04X} ({}{}{}{})", 
+            self.a(), 
+            self.f(),
+            if self.has_flag(FLAG_Z) { "Z" } else { "" },
+            if self.has_flag(FLAG_N) { "N" } else { "" },
+            if self.has_flag(FLAG_H) { "H" } else { "" },
+            if self.has_flag(FLAG_C) { "C" } else { "" }
+        ));
+
+        try!(writeln!(f, "B : {:#04X}\tC : {:#04X}", self.b(), self.c()));
+        try!(writeln!(f, "D : {:#04X}\tE : {:#04X}", self.d(), self.e()));
+        try!(writeln!(f, "H : {:#04X}\tL : {:#04X}", self.h(), self.l()));
+        writeln!(f, "SP: {:#06X}\tPC: {:#06X}", self.sp(), self.pc())
     }
 }

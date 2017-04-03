@@ -82,7 +82,13 @@ impl fmt::Display for Instruction {
             Ld8(ref dest, ref src) => write!(f, "LD {}, {}", dest, src),
             Ld16(ref dest, ref src) => write!(f, "LD {}, {}", dest, src),
             Stop => write!(f, "STOP 0"),
-            Jr(ref cond, ref addr) => write!(f, "JR {}, {}", cond, addr),
+            Jr(ref cond, ref addr) => {
+                if *cond == Condition::None {
+                    write!(f, "JR {}", addr)
+                } else {
+                    write!(f, "JR {}, {}", cond, addr)
+                }
+            },
             Add16(ref dest, ref src) => write!(f, "ADD {}, {}", dest, src),
             Inc8(ref reg) => write!(f, "INC {}", reg),
             Inc16(ref reg) => write!(f, "INC {}", reg),
@@ -107,17 +113,35 @@ impl fmt::Display for Instruction {
             Or(ref reg) => write!(f, "OR {}", reg),
             Cp(ref reg) => write!(f, "CP {}", reg),
             Halt => write!(f, "HALT"),
-            Ret(ref cond) => write!(f, "RET {}", cond),
+            Ret(ref cond) => {
+                if *cond == Condition::None {
+                    write!(f, "RET")
+                } else {
+                    write!(f, "RET {}", cond)
+                }
+            },
             AddSp(ref reg) => write!(f, "ADD SP, {}", reg),
             Ldh(ref dest, ref src) => write!(f, "LDH {}, {}", dest, src),
             Ldhl(ref offset) => write!(f, "LDHL {}", offset),
             Pop(ref reg) => write!(f, "POP {}", reg),
             Reti => write!(f, "RETI"),
-            Jp(ref cond, ref addr) => write!(f, "JP {}, {}", cond, addr),
+            Jp(ref cond, ref addr) => {
+                if *cond == Condition::None {
+                    write!(f, "JP {}", addr)
+                } else {
+                    write!(f, "JP {}, {}", cond, addr)
+                }
+            },
             Di => write!(f, "DI"),
             Ei => write!(f, "EI"),
             Prefix => write!(f, "PREFIX CB"),
-            Call(ref cond, ref addr) => write!(f, "CALL {}, {}", cond, addr),
+            Call(ref cond, ref addr) => {
+                if *cond == Condition::None {
+                    write!(f, "CALL {}", addr)
+                } else {
+                    write!(f, "CALL {}, {}", cond, addr)
+                }
+            },
             Push(ref reg) => write!(f, "PUSH {}", reg),
             Rst(idx) => write!(f, "RST {}", idx),
             Rlc(ref reg) => write!(f, "RLC {}", reg),

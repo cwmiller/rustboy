@@ -168,6 +168,7 @@ pub fn or(cpu: &mut Cpu, bus: &mut Bus, src: &AddressingMode<u8>) {
 pub fn cp(cpu: &mut Cpu, bus: &mut Bus, src: &AddressingMode<u8>) {
     let existing = cpu.regs.a();
     let val = src.read(cpu, bus);
+
     let flags =
         if existing == val { FLAG_Z } else { 0 }                    // Z
         | FLAG_N                                                    // N
