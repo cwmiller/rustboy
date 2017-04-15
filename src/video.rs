@@ -1,4 +1,4 @@
-use bus::{Addressable, Bus};
+use bus::Addressable;
 
 pub const CYCLES_PER_LINE: usize = 456;
 pub const CYCLES_PER_FRAME: usize = 70224;

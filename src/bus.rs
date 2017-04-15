@@ -1,5 +1,5 @@
 use cartridge::Cartridge;
-use video::{StepResult, Video};
+use video::Video;
 
 const CARTRIDGE_ROM_START: u16 = 0;
 const CARTRIDGE_ROM_END: u16 = 0x7FFF;
@@ -36,52 +36,27 @@ pub trait Addressable {
     fn write(&mut self, addr: u16, val: u8);
 }
 
-struct WorkRam {
+struct Ram {
+    start_addr: u16,
     data: Vec<u8>
 }
 
-impl WorkRam {
-    fn new() -> Self {
-        WorkRam {
-            data: vec![0; WORK_RAM_SIZE]
+impl Ram {
+    fn new(start_addr: u16, size: usize) -> Self {
+        Ram {
+            start_addr: start_addr,
+            data: vec![0; size]
         }
     }
 }
 
-#[inline(always)]
-fn work_ram_addr(addr: u16) -> u16 {
-    if addr >= ECHO_RAM_START { addr - ECHO_RAM_START } else { addr }
-}
-
-impl Addressable for WorkRam {
+impl Addressable for Ram {
     fn read(&self, addr: u16) -> u8 {
-        self.data[(work_ram_addr(addr) - WORK_RAM_START) as usize]
+        self.data[(addr - self.start_addr) as usize]
     }
 
     fn write(&mut self, addr: u16, val: u8) {
-        self.data[(work_ram_addr(addr) - WORK_RAM_START) as usize] = val;
-    }
-}
-
-struct HighRam {
-    data: Vec<u8>
-}
-
-impl HighRam {
-    fn new() -> Self {
-        HighRam {
-            data: vec![0; HIGH_RAM_SIZE]
-        }
-    }
-}
-
-impl Addressable for HighRam {
-    fn read(&self, addr: u16) -> u8 {
-        self.data[(addr - HIGH_RAM_START) as usize]
-    }
-
-    fn write(&mut self, addr: u16, val: u8) {
-        self.data[(addr - HIGH_RAM_START) as usize] = val;
+        self.data[(addr - self.start_addr) as usize] = val;
     }
 }
 
@@ -89,9 +64,9 @@ pub struct Bus {
     cartridge_rom: Cartridge,
     io_ie: u8,
     io_if: u8,
-    high_ram: HighRam,
+    high_ram: Ram,
     pub video: Video,
-    work_ram: WorkRam,
+    work_ram: Ram,
 }
 
 impl Bus {
@@ -100,9 +75,9 @@ impl Bus {
             cartridge_rom: cart,
             io_ie: 0,
             io_if: 0,
-            high_ram: HighRam::new(),
+            high_ram: Ram::new(HIGH_RAM_START, HIGH_RAM_SIZE),
             video: Video::default(),
-            work_ram: WorkRam::new()
+            work_ram: Ram::new(WORK_RAM_START, WORK_RAM_SIZE)
         }
     }
 }
@@ -110,15 +85,25 @@ impl Bus {
 impl Addressable for Bus {
     fn read(&self, addr: u16) -> u8 {
         match addr {
+            // 0x0000 - 0x7FFF Cartridge ROM
             CARTRIDGE_ROM_START...CARTRIDGE_ROM_END => self.cartridge_rom.read(addr),
+            // 0x8000 - 0x9FFF Video ROM
             VIDEO_RAM_START...VIDEO_RAM_END => { println!("Video RAM read unimplemented ({:#X})", addr); 0 },
+            // 0xA000 - 0xBFFF RAM bank
             SWITCHABLE_RAM_START...SWITCHABLE_RAM_END => { println!("Switchable RAM read unimplemented ({:#X})", addr); 0 },
-            WORK_RAM_START...WORK_RAM_END 
-            | ECHO_RAM_START...ECHO_RAM_END => self.work_ram.read(addr),
+            // 0xC000 - 0xDFFF Work RAM
+            WORK_RAM_START...WORK_RAM_END => self.work_ram.read(addr),
+            // 0xE000 - 0xFDFF Echo of Work RAM
+            ECHO_RAM_START...ECHO_RAM_END => self.work_ram.read(addr - 0x2000),
+            // 0xFE00 - 0xFE9F Sprite OAM
             OAM_START...OAM_END => { println!("OAM read unimplemented ({:#X})", addr); 0 },
+            // 0xFF40 - 0xFE9F Video IO ports
             IO_VIDEO_START...IO_VIDEO_END => self.video.read(addr),
+            // 0xFF0F IF IO port
             IO_IF_ADDR => self.io_if,
+            // 0xFF80 - 0xFFFE High RAM
             HIGH_RAM_START...HIGH_RAM_END => self.high_ram.read(addr),
+            // 0xFFFF IE IO port
             IO_IE_ADDR => self.io_ie,
             _ => { println!("Unimplemented read ({:#X})", addr); 0 }
         }
@@ -126,15 +111,25 @@ impl Addressable for Bus {
 
     fn write(&mut self, addr: u16, val: u8) {
         match addr {
+            // 0x0000 - 0x7FFF Cartridge ROM
             CARTRIDGE_ROM_START...CARTRIDGE_ROM_END => self.cartridge_rom.write(addr, val),
+            // 0x8000 - 0x9FFF Video ROM
             VIDEO_RAM_START...VIDEO_RAM_END => println!("Video RAM write unimplemented ({:#X} -> {:#X})", val, addr),
+            // 0xA000 - 0xBFFF RAM bank
             SWITCHABLE_RAM_START...SWITCHABLE_RAM_END => println!("Switchable RAM write unimplemented ({:#X} -> {:#X})", val, addr),
-            WORK_RAM_START...WORK_RAM_END 
-            | ECHO_RAM_START...ECHO_RAM_END => self.work_ram.write(addr, val),
+            // 0xC000 - 0xDFFF Work RAM
+            WORK_RAM_START...WORK_RAM_END => self.work_ram.write(addr, val),
+            // 0xE000 - 0xFDFF Echo of Work RAM
+            ECHO_RAM_START...ECHO_RAM_END => self.work_ram.write(addr - 0x2000, val),
+            // 0xFE00 - 0xFE9F Sprite OAM
             OAM_START...OAM_END => println!("OAM write unimplemented ({:#X} -> {:#X})", val, addr),
+            // 0xFF40 - 0xFE9F Video IO ports
             IO_VIDEO_START...IO_VIDEO_END => self.video.write(addr, val),
+            // 0xFF0F IF IO port
             IO_IF_ADDR => self.io_if = val,
+            // 0xFF80 - 0xFFFE High RAM
             HIGH_RAM_START...HIGH_RAM_END => self.high_ram.write(addr, val),
+            // 0xFFFF IE IO port
             IO_IE_ADDR => self.io_ie = val,
             _ => println!("Unimplemented write ({:#X} -> {:#X})", val, addr)
         }
