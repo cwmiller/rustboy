@@ -3,8 +3,9 @@ mod instructions;
 mod registers;
 
 use self::addressing::*;
-use bus::{Bus, Addressable};
+use bus::{Addressable, Bus, IO_IE_ADDR, IO_IF_ADDR};
 use byteorder::{ByteOrder, LittleEndian};
+use enum_primitive::FromPrimitive;
 use self::instructions as inst;
 use self::registers::*;
 use std::fmt;
@@ -27,6 +28,26 @@ impl fmt::Display for Condition {
             Condition::Nz => write!(f, "NZ"),
             Condition::Nc => write!(f, "NC")
         }
+    }
+}
+
+enum_from_primitive! {
+pub enum Interrupt {
+    Keypad = 0b00010000,
+    Serial = 0b00001000,
+    Timer  = 0b00000100,
+    Lcdc   = 0b00000010,
+    VBlank = 0b00000001
+}
+}
+
+fn interrupt_start_address(interrupt: Interrupt) -> u16 {
+    match interrupt {
+        Interrupt::Keypad => 0x60,
+        Interrupt::Serial => 0x58,
+        Interrupt::Timer => 0x50,
+        Interrupt::Lcdc => 0x48,
+        Interrupt::VBlank => 0x40
     }
 }
 
@@ -63,12 +84,12 @@ impl Cpu {
     pub fn new() -> Self {
         Cpu {
             regs: Registers::default(),
-            ime: false,
+            ime: true,
             prefixed: false
         }
     }
 
-    pub fn power_on(&mut self) {
+    pub fn reset(&mut self) {
         self.regs.set_af(0x01B0);
         self.regs.set_bc(0x1300);
         self.regs.set_de(0xD800);
@@ -80,6 +101,8 @@ impl Cpu {
     }
 
     pub fn step(&mut self, bus: &mut Bus) -> usize {
+        self.handle_pending_interrupt(bus);
+
         let pc = self.regs.pc();
         let opcode = bus.read(pc);
         
@@ -108,12 +131,19 @@ impl Cpu {
         if decoded_instruction.is_some() {
             let instruction = decoded_instruction.unwrap();
 
-            println!("{:#06X}: {}", pc, instruction);
+            //println!("{:#06X}: {}", pc, instruction);
             inst::execute(self, bus, instruction);
-            println!("{:?}", self);
+            //println!("{:?}", self);
         }
 
         cycles
+    }
+
+    pub fn interrupt(&self, bus: &mut Bus, interrupt: Interrupt) {
+        let flags = bus.read(IO_IF_ADDR);
+        let interrupt_flag = interrupt as u8;
+
+        bus.write(IO_IF_ADDR, flags | interrupt_flag);
     }
 
     fn pop_stack(&mut self, bus: &Bus) -> u16 {
@@ -143,6 +173,35 @@ impl Cpu {
             Condition::Nz => (self.regs.f() & FLAG_Z) != FLAG_Z
         }
     }
+
+    fn handle_pending_interrupt(&mut self, bus: &mut Bus) {
+        if self.ime {
+            let pending_interrupts = bus.read(IO_IF_ADDR) & bus.read(IO_IE_ADDR);
+
+            if pending_interrupts > 0 {
+                let mut flag = Interrupt::Keypad as u8;
+
+                while flag > 0 {
+                    if pending_interrupts & flag == flag {
+                        self.ime = false;
+                        bus.write(IO_IF_ADDR, pending_interrupts ^ flag);
+
+                        let interrupt = Interrupt::from_u8(flag).unwrap();
+                        let current_pc = self.regs.pc();
+                        let interrupt_addr = interrupt_start_address(interrupt);
+
+                        println!("Handling interrupt {:#X}, setting PC to {:#X}", flag, interrupt_addr);
+
+                        self.push_stack(bus, current_pc);
+                        self.regs.set_pc(interrupt_addr);
+                        break;
+                    }
+
+                    flag = flag >> 1;
+                }
+            }
+        }
+    }
 }
 
 impl fmt::Debug for Cpu {
@@ -150,7 +209,7 @@ impl fmt::Debug for Cpu {
         try!(writeln!(f, "State:"));
         try!(writeln!(f, "Ints: {}\tPrefixed: {}",  
             if self.ime { "Enabled" } else { "Disabled" },
-            if self.ime { "Yes" } else { "No" },
+            if self.prefixed { "Yes" } else { "No" },
         ));
 
         try!(writeln!(f, "Registers:"));

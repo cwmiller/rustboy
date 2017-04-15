@@ -1,5 +1,6 @@
 use std::fmt;
 
+#[allow(dead_code)]
 pub enum Register {
     A,
     B,
@@ -59,7 +60,7 @@ impl Registers {
     }
 
     pub fn set_a(&mut self, val: u8) {
-        self.af = self.af | ((val as u16) << 8);
+        self.af = (self.af & 0x00FF) | ((val as u16) << 8);
     }
 
     pub fn b(&self) -> u8 {
@@ -71,11 +72,11 @@ impl Registers {
     }
 
     pub fn c(&self) -> u8 {
-        (self.bc & 0xFF) as u8
+        (self.bc & 0x00FF) as u8
     }
 
     pub fn set_c(&mut self, val: u8) {
-        self.bc = (self.bc & 0xFF) | (val as u16) & 0xFF;
+        self.bc = (self.bc & 0xFF00) | (val as u16) & 0xFF;
     }
 
     pub fn d(&self) -> u8 {
@@ -87,7 +88,7 @@ impl Registers {
     }
 
     pub fn e(&self) -> u8 {
-        (self.de & 0xFF) as u8
+        (self.de & 0x00FF) as u8
     }
 
     pub fn set_e(&mut self, val: u8) {
@@ -95,7 +96,7 @@ impl Registers {
     }
 
     pub fn f(&self) -> u8 {
-        (self.af & 0xFF) as u8
+        (self.af & 0x00FF) as u8
     }
 
     pub fn set_f(&mut self, val: u8) {
@@ -111,7 +112,7 @@ impl Registers {
     }
 
     pub fn l(&self) -> u8 {
-        (self.hl & 0xFF) as u8
+        (self.hl & 0x00FF) as u8
     }
 
     pub fn set_l(&mut self, val: u8) {

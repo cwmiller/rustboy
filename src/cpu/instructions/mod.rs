@@ -267,9 +267,9 @@ pub fn decode(opcode: u8, prefixed: bool, mut next: &mut FnMut() -> u8) -> Optio
                 (0, _, 3, 0, _) => Some(Inc16(reg_addr(reg_pair_table(p)))),
                 (0, _, 3, 1, _) => Some(Dec16(reg_addr(reg_pair_table(p)))),
                 // X=0, Z=4
-                (0, _, 4, _, _) => Some(Inc8(reg_addr_table(p))),
+                (0, _, 4, _, _) => Some(Inc8(reg_addr_table(y))),
                 // X=0, Z=5
-                (0, _, 5, _, _) => Some(Dec8(reg_addr_table(p))),
+                (0, _, 5, _, _) => Some(Dec8(reg_addr_table(y))),
                 // X=0, Z=6
                 (0, _, 6, _, _) => Some(Ld8(reg_addr_table(y), imm8_addr(next()))),
                 // X=0, Z=7
