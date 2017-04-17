@@ -23,6 +23,8 @@ fn main() {
     file.read_to_end(&mut rom_data).unwrap();
 
     let cart = Cartridge::new(rom_data);
+
+    println!("Loaded {}", cart);
     run(cart);
 }
 

@@ -61,7 +61,7 @@ impl Addressable for Ram {
 }
 
 pub struct Bus {
-    cartridge_rom: Cartridge,
+    cartridge: Cartridge,
     io_ie: u8,
     io_if: u8,
     high_ram: Ram,
@@ -72,7 +72,7 @@ pub struct Bus {
 impl Bus {
     pub fn new(cart: Cartridge) -> Self {
         Bus {
-            cartridge_rom: cart,
+            cartridge: cart,
             io_ie: 0,
             io_if: 0,
             high_ram: Ram::new(HIGH_RAM_START, HIGH_RAM_SIZE),
@@ -86,11 +86,11 @@ impl Addressable for Bus {
     fn read(&self, addr: u16) -> u8 {
         match addr {
             // 0x0000 - 0x7FFF Cartridge ROM
-            CARTRIDGE_ROM_START...CARTRIDGE_ROM_END => self.cartridge_rom.read(addr),
+            CARTRIDGE_ROM_START...CARTRIDGE_ROM_END => self.cartridge.read(addr),
             // 0x8000 - 0x9FFF Video ROM
             VIDEO_RAM_START...VIDEO_RAM_END => { println!("Video RAM read unimplemented ({:#X})", addr); 0 },
             // 0xA000 - 0xBFFF RAM bank
-            SWITCHABLE_RAM_START...SWITCHABLE_RAM_END => { println!("Switchable RAM read unimplemented ({:#X})", addr); 0 },
+            SWITCHABLE_RAM_START...SWITCHABLE_RAM_END => self.cartridge.read(addr),
             // 0xC000 - 0xDFFF Work RAM
             WORK_RAM_START...WORK_RAM_END => self.work_ram.read(addr),
             // 0xE000 - 0xFDFF Echo of Work RAM
@@ -112,11 +112,11 @@ impl Addressable for Bus {
     fn write(&mut self, addr: u16, val: u8) {
         match addr {
             // 0x0000 - 0x7FFF Cartridge ROM
-            CARTRIDGE_ROM_START...CARTRIDGE_ROM_END => self.cartridge_rom.write(addr, val),
+            CARTRIDGE_ROM_START...CARTRIDGE_ROM_END => self.cartridge.write(addr, val),
             // 0x8000 - 0x9FFF Video ROM
             VIDEO_RAM_START...VIDEO_RAM_END => println!("Video RAM write unimplemented ({:#X} -> {:#X})", val, addr),
             // 0xA000 - 0xBFFF RAM bank
-            SWITCHABLE_RAM_START...SWITCHABLE_RAM_END => println!("Switchable RAM write unimplemented ({:#X} -> {:#X})", val, addr),
+            SWITCHABLE_RAM_START...SWITCHABLE_RAM_END => self.cartridge.write(addr, val),
             // 0xC000 - 0xDFFF Work RAM
             WORK_RAM_START...WORK_RAM_END => self.work_ram.write(addr, val),
             // 0xE000 - 0xFDFF Echo of Work RAM

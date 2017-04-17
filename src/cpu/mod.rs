@@ -206,7 +206,6 @@ impl Cpu {
 
 impl fmt::Debug for Cpu {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        try!(writeln!(f, "State:"));
         try!(writeln!(f, "Ints: {}\tPrefixed: {}",  
             if self.ime { "Enabled" } else { "Disabled" },
             if self.prefixed { "Yes" } else { "No" },
