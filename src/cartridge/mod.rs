@@ -27,32 +27,32 @@ impl fmt::Display for MapperType {
 }
 
 pub struct Cartridge {
-    data: Vec<u8>,
+    rom: Vec<u8>,
     mapper: Option<Box<Mapper>>
 }
 
 impl Cartridge {
-    pub fn new(data: Vec<u8>) -> Cartridge {
+    pub fn new(rom: Vec<u8>) -> Cartridge {
         Cartridge {
-            mapper: create_mapper(data[0x147]),
-            data: data
+            mapper: create_mapper(rom[0x147]),
+            rom: rom
         }
     }
 
     pub fn name(&self) -> String {
-        String::from_utf8((&self.data[0x0134..0x0143]).to_vec()).unwrap_or("UNKNOWN".to_string())
+        String::from_utf8((&self.rom[0x0134..0x0143]).to_vec()).unwrap_or("UNKNOWN".to_string())
     }
 
     pub fn gbc(&self) -> bool {
-        self.data[0x0143] == 0x80
+        self.rom[0x0143] == 0x80
     }
 
     pub fn sgb(&self) -> bool {
-        self.data[0x0146] == 0x03
+        self.rom[0x0146] == 0x03
     }
 
     pub fn mapper_type(&self) -> Option<MapperType> {
-        match self.data[0x0147] {
+        match self.rom[0x0147] {
             0x01 => Some(MapperType::Mbc1),
             0x02 => Some(MapperType::Mbc1),
             0x03 => Some(MapperType::Mbc1),
@@ -88,16 +88,16 @@ impl Addressable for Cartridge {
     fn read(&self, addr: u16) -> u8 {
         if self.mapper.is_some() {
             let mapper = self.mapper.as_ref().unwrap();
-            mapper.read(&self.data, addr)
+            mapper.read(&self.rom, addr)
         } else {
-            self.data[addr as usize]
+            self.rom[addr as usize]
         }
     }
 
     fn write(&mut self, addr: u16, val: u8) {
         if self.mapper.is_some() {
             let mapper = self.mapper.as_mut().unwrap();
-            mapper.write(&self.data, addr, val)
+            mapper.write(addr, val)
         } else {
             panic!("Cannot write to ROM!");
         }
@@ -105,11 +105,11 @@ impl Addressable for Cartridge {
 }
 
 trait Mapper {
-    fn read(&self, data: &Vec<u8>, addr: u16) -> u8;
-    fn write(&mut self, data: &Vec<u8>, addr: u16, val: u8);
+    fn read(&self, rom: &Vec<u8>, addr: u16) -> u8;
+    fn write(&mut self, addr: u16, val: u8);
 }
 
-fn create_mapper(cartridgeType: u8) -> Option<Box<Mapper>> {
+fn create_mapper(cartridge_type: u8) -> Option<Box<Mapper>> {
     // TODO
     Some(Box::new(Mbc1::new(0, 0)))
 }

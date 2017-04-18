@@ -1,11 +1,11 @@
 use cartridge::Cartridge;
-use video::Video;
+use lcd::Lcd;
 
 const CARTRIDGE_ROM_START: u16 = 0;
 const CARTRIDGE_ROM_END: u16 = 0x7FFF;
 
-const VIDEO_RAM_START: u16 = 0x8000;
-const VIDEO_RAM_END: u16 = 0x9FFF;
+pub const VIDEO_RAM_START: u16 = 0x8000;
+pub const VIDEO_RAM_END: u16 = 0x9FFF;
 
 const SWITCHABLE_RAM_START: u16 = 0xA000;
 const SWITCHABLE_RAM_END: u16 = 0xBFFF;
@@ -17,8 +17,8 @@ const WORK_RAM_SIZE: usize = (WORK_RAM_END as usize) - (WORK_RAM_START as usize)
 const ECHO_RAM_START: u16 = 0xE000;
 const ECHO_RAM_END: u16 = 0xFDFF;
 
-const OAM_START: u16 = 0xFE00;
-const OAM_END: u16 = 0xFE9F;
+pub const OAM_START: u16 = 0xFE00;
+pub const OAM_END: u16 = 0xFE9F;
 
 const IO_VIDEO_START: u16 = 0xFF40;
 const IO_VIDEO_END: u16 = 0xFF4B;
@@ -65,7 +65,7 @@ pub struct Bus {
     io_ie: u8,
     io_if: u8,
     high_ram: Ram,
-    pub video: Video,
+    pub lcd: Lcd,
     work_ram: Ram,
 }
 
@@ -76,7 +76,7 @@ impl Bus {
             io_ie: 0,
             io_if: 0,
             high_ram: Ram::new(HIGH_RAM_START, HIGH_RAM_SIZE),
-            video: Video::default(),
+            lcd: Lcd::new(),
             work_ram: Ram::new(WORK_RAM_START, WORK_RAM_SIZE)
         }
     }
@@ -88,7 +88,7 @@ impl Addressable for Bus {
             // 0x0000 - 0x7FFF Cartridge ROM
             CARTRIDGE_ROM_START...CARTRIDGE_ROM_END => self.cartridge.read(addr),
             // 0x8000 - 0x9FFF Video ROM
-            VIDEO_RAM_START...VIDEO_RAM_END => { println!("Video RAM read unimplemented ({:#X})", addr); 0 },
+            VIDEO_RAM_START...VIDEO_RAM_END => self.lcd.read(addr),
             // 0xA000 - 0xBFFF RAM bank
             SWITCHABLE_RAM_START...SWITCHABLE_RAM_END => self.cartridge.read(addr),
             // 0xC000 - 0xDFFF Work RAM
@@ -96,9 +96,9 @@ impl Addressable for Bus {
             // 0xE000 - 0xFDFF Echo of Work RAM
             ECHO_RAM_START...ECHO_RAM_END => self.work_ram.read(addr - 0x2000),
             // 0xFE00 - 0xFE9F Sprite OAM
-            OAM_START...OAM_END => { println!("OAM read unimplemented ({:#X})", addr); 0 },
+            OAM_START...OAM_END => self.lcd.read(addr),
             // 0xFF40 - 0xFE9F Video IO ports
-            IO_VIDEO_START...IO_VIDEO_END => self.video.read(addr),
+            IO_VIDEO_START...IO_VIDEO_END => self.lcd.read(addr),
             // 0xFF0F IF IO port
             IO_IF_ADDR => self.io_if,
             // 0xFF80 - 0xFFFE High RAM
@@ -114,7 +114,7 @@ impl Addressable for Bus {
             // 0x0000 - 0x7FFF Cartridge ROM
             CARTRIDGE_ROM_START...CARTRIDGE_ROM_END => self.cartridge.write(addr, val),
             // 0x8000 - 0x9FFF Video ROM
-            VIDEO_RAM_START...VIDEO_RAM_END => println!("Video RAM write unimplemented ({:#X} -> {:#X})", val, addr),
+            VIDEO_RAM_START...VIDEO_RAM_END => self.lcd.write(addr, val),
             // 0xA000 - 0xBFFF RAM bank
             SWITCHABLE_RAM_START...SWITCHABLE_RAM_END => self.cartridge.write(addr, val),
             // 0xC000 - 0xDFFF Work RAM
@@ -122,9 +122,9 @@ impl Addressable for Bus {
             // 0xE000 - 0xFDFF Echo of Work RAM
             ECHO_RAM_START...ECHO_RAM_END => self.work_ram.write(addr - 0x2000, val),
             // 0xFE00 - 0xFE9F Sprite OAM
-            OAM_START...OAM_END => println!("OAM write unimplemented ({:#X} -> {:#X})", val, addr),
+            OAM_START...OAM_END => self.lcd.write(addr, val),
             // 0xFF40 - 0xFE9F Video IO ports
-            IO_VIDEO_START...IO_VIDEO_END => self.video.write(addr, val),
+            IO_VIDEO_START...IO_VIDEO_END => self.lcd.write(addr, val),
             // 0xFF0F IF IO port
             IO_IF_ADDR => self.io_if = val,
             // 0xFF80 - 0xFFFE High RAM
