@@ -4,6 +4,7 @@ version = "0.1.0"
 authors = ["Chase Miller"]
 
 [dependencies]
+bitflags = "0.8"
 byteorder = "0.4.2"
 enum_primitive = "*"
 regex = "0.2"

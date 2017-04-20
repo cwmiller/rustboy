@@ -1,44 +1,103 @@
 use bus::{Addressable, OAM_START, OAM_END, VIDEO_RAM_START, VIDEO_RAM_END};
+use enum_primitive::FromPrimitive;
 
 pub const LCD_WIDTH: usize = 160;
 pub const LCD_HEIGHT: usize = 144;
 
-pub const CYCLES_PER_LINE: usize = 456;
-pub const CYCLES_PER_FRAME: usize = 70224;
-
 const ADDR_LCDC: u16 = 0xFF40;
 const ADDR_STAT: u16 = 0xFF41;
-const ADDR_SCY: u16 = 0xFF42;
-const ADDR_LY: u16 = 0xFF44;
-const ADDR_LYC: u16 = 0xFF45;
-const ADDR_DMA: u16 = 0xFF46;
-const ADDR_BGP: u16 = 0xFF47;
+const ADDR_SCY: u16  = 0xFF42;
+const ADDR_SCX: u16  = 0xFF43;
+const ADDR_LY: u16   = 0xFF44;
+const ADDR_LYC: u16  = 0xFF45;
+const ADDR_DMA: u16  = 0xFF46;
+const ADDR_BGP: u16  = 0xFF47;
 const ADDR_OBP0: u16 = 0xFF48;
 const ADDR_OBP1: u16 = 0xFF49;
-const ADDR_WY: u16 = 0xFF4A;
-const ADDR_LX: u16 = 0xFF4B;
+const ADDR_WY: u16   = 0xFF4A;
+const ADDR_WX: u16   = 0xFF4B;
 
-struct Lcdc(u8);
-struct Stat(u8);
-struct Bgp(u8);
+bitflags! {
+    flags Lcdc: u8 {
+        const LCDC_ENABLED          = 0b1000_0000,
+        const LCDC_TILE_TBL_9C      = 0b0100_0000,
+        const LCDC_WIN_ENABLED      = 0b0010_0000,
+        const LCDC_SIGNED_TILE_DATA = 0b0001_0000,
+        const LCDC_BG_TILE_TBL_9C   = 0b0000_1000,
+        const LCDC_16PX_SPRITE      = 0b0000_0100,
+        const LCDC_SPRITE_DISPLAY   = 0b0000_0010,
+        const LCDC_BG_DISPLAY       = 0b0000_0001
+    }
+}
 
-#[derive(PartialEq)]
-pub enum StepResult {
-    None,
-    InterruptVBlank
+// STAT is mostly flags, but the lower 2 bits are the current mode
+// Mode is will stored separately so the Stat struct is only treated as bitflags.
+bitflags! {
+    flags Stat: u8 {
+        const STAT_COINCIDENCE_INT   = 0b0100_0000,
+        const STAT_OAM_INT           = 0b0010_0000,
+        const STAT_VBLANK_INT        = 0b0001_0000,
+        const STAT_HBLANK_INT        = 0b0000_1000,
+        const STAT_COINCIDENCE_EQUAL = 0b0000_0100
+    }
+}
+
+enum_from_primitive! {
+#[derive(Copy, Clone, PartialEq)]
+pub enum Mode {
+    VBlank   = 0,
+    HBlank   = 1,
+    Oam      = 2,
+    Transfer = 3
+}
+}
+
+const CYCLES_PER_OAM_READ: usize = 80;
+const CYCLES_PER_TRANSFER: usize = 172;
+const CYCLES_PER_HBLANK: usize = 204;
+const CYCLES_PER_LINE: usize = 456;
+pub const CYCLES_PER_FRAME: usize = 70224;
+
+const SHADE_WHITE: u8      = 0;
+const SHADE_LIGHT_GRAY: u8 = 1;
+const SHADE_DARK_GRAY: u8  = 2;
+const SHADE_BLACK: u8      = 3;
+
+struct Pallete(u8);
+
+impl Pallete {
+    fn shade(&self, idx: u8) -> u8 {
+        self.0 >> (idx * 2)
+    }
+
+    fn set_shade(&mut self, idx: u8, shade: u8) {
+        self.0 = self.0 | shade << (idx * 2);
+    }
+}
+
+#[derive(Default)]
+pub struct StepResult {
+    pub int_vblank: bool,
+    pub int_stat: bool
 }
 
 pub struct Lcd {
     vram: Vec<u8>,
     oam: Vec<u8>,
-
     lcdc: Lcdc,
     stat: Stat,
-    bgp: Bgp,
+    scy: u8,
     scx: u8,
     ly: u8,
     lyc: u8,
-    wy: u8
+    bgp: Pallete,
+    obp0: Pallete,
+    obp1: Pallete,
+    wy: u8,
+    wx: u8,
+
+    mode: Mode,
+    mode_cycles: usize
 }
 
 impl Lcd {
@@ -46,34 +105,97 @@ impl Lcd {
         Lcd {
             vram: vec![0; (VIDEO_RAM_END - VIDEO_RAM_START) as usize + 1],
             oam: vec![0; (OAM_END - OAM_START) as usize + 1],
-
-            lcdc: Lcdc(0),
-            stat: Stat(0),
-            bgp: Bgp(0),
+            lcdc: Lcdc::empty(),
+            stat: Stat::empty(),
+            scy: 0,
             scx: 0,
             ly: 0,
             lyc: 0,
-            wy: 0
+            bgp: Pallete(0),
+            obp0: Pallete(0),
+            obp1: Pallete(0),
+            wy: 0,
+            wx: 0,
+            mode: Mode::Oam,
+            mode_cycles: 0
         }
     }
 
     pub fn step(&mut self, cycles: usize) -> StepResult {
-        let previous_line = self.ly;
-        let current_line = cycles / CYCLES_PER_LINE;
+        let mut result = StepResult::default();
+        let previous_mode = self.mode;
 
-        // Reset to line 0 if we've exceeded the screen size
-        if current_line > 153 {
-            self.ly = 0;
-        } else {
-            self.ly = current_line as u8;
+        self.mode_cycles = self.mode_cycles + cycles;
+
+        // Current mode is stored in the lower two bits of the STAT register
+        match self.mode {
+            Mode::Oam => {
+                // Process starts with the LCD controller reading information from OAM.
+                // This lasts 77-83 cycles
+                if self.mode_cycles >= CYCLES_PER_OAM_READ {
+                    // Move onto transfer stage
+                    self.mode = Mode::Transfer;
+                    self.mode_cycles = 0;
+                }
+            },
+            Mode::Transfer => {
+                // Data is being actively read by the LCD driver from OAM & VRAM.
+                // This lasts 169-175 cycles
+                if self.mode_cycles >= CYCLES_PER_TRANSFER {
+                    // Once transfer is complete, enter HBLANK
+                    self.mode = Mode::HBlank;
+                    self.mode_cycles = 0;
+                }
+            },
+            Mode::HBlank => {
+                // LCD has reached the end of a line.
+                // HBlank phase lasts 201-207 cycles
+                if self.mode_cycles >= CYCLES_PER_HBLANK {
+                    // LCD is ready to begin the next line
+                    self.ly = self.ly + 1;
+                    self.mode_cycles = 0;
+
+                    // If the LCD has line 144, then enter VBLANK. Else, enter OAM read.
+                    if self.ly == 144 { 
+                        self.mode = Mode::VBlank;
+                        result.int_vblank = true;
+                    } else { 
+                        self.mode = Mode::Oam;
+                    };
+                }
+            },
+            Mode::VBlank => {
+                // LCD is writing to VBlank lines
+                if self.mode_cycles >= CYCLES_PER_LINE {
+                    self.mode_cycles = 0;
+                    self.ly = self.ly + 1;
+
+                    if self.ly > 153 {
+                        // Finished with VBlank. Enter OAM with the first line.
+                        self.ly = 0;
+                        self.mode = Mode::Oam;
+                    }
+                } 
+            }
         }
 
-        // If we just arrived at frame 144, raise the vblank interrupt
-        if previous_line == 143 && current_line == 144 {
-            StepResult::InterruptVBlank
-        } else {
-            StepResult::None
+        // Check if a new mode has been entered during this step.
+        // If so, an interrupt will be raised if the respective flag is set in the STAT register
+        if (self.mode != previous_mode) {
+            let flag = match self.mode {
+                VBlank   => Some(STAT_VBLANK_INT),
+                HBlank   => Some(STAT_HBLANK_INT),
+                Oam      => Some(STAT_OAM_INT),
+                Transfer => None
+            };
+
+            if flag.is_some() && self.stat.contains(flag.unwrap()) {
+                result.int_stat = true;
+            }
         }
+
+        result
+        
     }
 }
 
@@ -82,8 +204,17 @@ impl Addressable for Lcd {
         match addr {
             VIDEO_RAM_START...VIDEO_RAM_END => self.vram[(addr - VIDEO_RAM_START) as usize],
             OAM_START...OAM_END => self.oam[(addr - OAM_START) as usize],
-
+            ADDR_LCDC => self.lcdc.bits,
+            ADDR_STAT => (self.stat.bits & 0b1111_1100) | (self.mode as u8),
+            ADDR_SCY => self.scy,
+            ADDR_SCX => self.scx,
             ADDR_LY => self.ly,
+            ADDR_LYC => self.lyc,
+            ADDR_BGP => self.bgp.0,
+            ADDR_OBP0 => self.obp0.0,
+            ADDR_OBP1 => self.obp1.0,
+            ADDR_WY => self.wy,
+            ADDR_WX => self.wx,
             _ => { println!("LCD IO read unimplemented ({:#X})", addr); 0 }
         }
     }
@@ -92,6 +223,21 @@ impl Addressable for Lcd {
         match addr {
             VIDEO_RAM_START...VIDEO_RAM_END => self.vram[(addr - VIDEO_RAM_START) as usize] = val,
             OAM_START...OAM_END => self.oam[(addr - OAM_START) as usize] = val,
+            ADDR_LCDC => self.lcdc.bits = val,
+            ADDR_STAT => {
+                self.stat.bits = val & 0b1111_1100;
+                self.mode = Mode::from_u8(val & 0b11).unwrap();
+            },
+            ADDR_SCY => self.scy = val,
+            ADDR_SCX => self.scx = val,
+            //ADDR_LY => self.ly = val,
+            ADDR_LYC => self.lyc = val,
+            ADDR_DMA => println!("DMA unimplemented"),
+            ADDR_BGP => self.bgp = Pallete(val),
+            ADDR_OBP0 => self.obp0 = Pallete(val),
+            ADDR_OBP1 => self.obp1 = Pallete(val),
+            ADDR_WY => self.wy = val,
+            ADDR_WX => self.wx = val,
             _ => println!("LCD IO write unimplemented {:#X} -> {:#X}", val, addr)
         }
     }

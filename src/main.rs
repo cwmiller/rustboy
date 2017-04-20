@@ -1,3 +1,5 @@
+#[macro_use] 
+extern crate bitflags;
 extern crate byteorder;
 #[macro_use] 
 extern crate enum_primitive;
@@ -11,7 +13,7 @@ mod lcd;
 use bus::Bus;
 use cartridge::Cartridge;
 use cpu::{Cpu, Interrupt};
-use lcd::{CYCLES_PER_FRAME, LCD_WIDTH, LCD_HEIGHT, StepResult as LcdStepResult};
+use lcd::{CYCLES_PER_FRAME, LCD_WIDTH, LCD_HEIGHT};
 use minifb::{Key, WindowOptions, Window};
 use std::env;
 use std::fs::File;
@@ -44,22 +46,28 @@ fn run(cart: Cartridge) {
 
     let mut cpu = Cpu::new();
     let mut bus = Bus::new(cart);
-    let mut cycles = 0;
+    //let mut cycles = 0;
 
     cpu.reset();
 
     while window.is_open() && !window.is_key_down(Key::Escape) {
-        cycles = cycles + cpu.step(&mut bus);
+        let cycles = cpu.step(&mut bus);
 
         let result = bus.lcd.step(cycles);
-        if result == LcdStepResult::InterruptVBlank {
+        if result.int_vblank {
             cpu.interrupt(&mut bus, Interrupt::VBlank);
+            window.update_with_buffer(&framebuffer);
+        }
+        if result.int_stat {
+            cpu.interrupt(&mut bus, Interrupt::Stat);
         }
 
+        /*
         // Reset on frame
         if cycles >= CYCLES_PER_FRAME {
             cycles = 0;
             window.update_with_buffer(&framebuffer);
         }
+        */
     }
 }

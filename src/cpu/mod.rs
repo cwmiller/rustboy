@@ -36,7 +36,7 @@ pub enum Interrupt {
     Keypad = 0b00010000,
     Serial = 0b00001000,
     Timer  = 0b00000100,
-    Lcdc   = 0b00000010,
+    Stat   = 0b00000010,
     VBlank = 0b00000001
 }
 }
@@ -46,7 +46,7 @@ fn interrupt_start_address(interrupt: Interrupt) -> u16 {
         Interrupt::Keypad => 0x60,
         Interrupt::Serial => 0x58,
         Interrupt::Timer => 0x50,
-        Interrupt::Lcdc => 0x48,
+        Interrupt::Stat => 0x48,
         Interrupt::VBlank => 0x40
     }
 }

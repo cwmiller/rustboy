@@ -8,31 +8,31 @@ impl BankSelection {
         self.0 = self.0 | ((mode as u8) << 7)
     }
 
-    fn get_mode(&self) -> BankMode {
-        BankMode::from_u8((self.0 & 0b10000000) >> 7).unwrap()
+    fn mode(&self) -> BankMode {
+        BankMode::from_u8((self.0 & 0b1000_0000) >> 7).unwrap()
     }
 
     fn set_upper(&mut self, val: u8) {
-        self.0 = (self.0 & 0b10001111) | ((val & 0b01110000) << 4);
+        self.0 = (self.0 & 0b1000_1111) | ((val & 0b0111_0000) << 4);
     }
 
-    fn get_upper(&self) -> u8 {
-        (self.0 & 0b01110000) >> 4
+    fn upper(&self) -> u8 {
+        (self.0 & 0b0111_0000) >> 4
     }
 
     fn set_lower(&mut self, val: u8) {
-        self.0 = (self.0 & 0b11110000) | (val & 0b00001111);
+        self.0 = (self.0 & 0b1111_0000) | (val & 0b0000_1111);
     }
 
-    fn get_lower(&self) -> u8 {
-        self.0 & 0b00001111
+    fn lower(&self) -> u8 {
+        self.0 & 0b0000_1111
     }
 
     fn rom_bank(&self) -> usize {
-        let bank = if self.get_mode() == BankMode::Rom {
-            (self.get_upper() << 4) | self.get_lower()
+        let bank = if self.mode() == BankMode::Rom {
+            (self.upper() << 4) | self.lower()
         } else {
-            self.get_lower()
+            self.lower()
         };
 
         (match bank {
@@ -42,8 +42,8 @@ impl BankSelection {
     }
 
     fn ram_bank(&self) -> usize {
-        if self.get_mode() == BankMode::Ram {
-            self.get_upper() as usize
+        if self.mode() == BankMode::Ram {
+            self.upper() as usize
         } else {
             0
         }
