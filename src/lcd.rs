@@ -161,6 +161,8 @@ impl Lcd {
                     } else { 
                         self.mode = Mode::Oam;
                     };
+
+                    self.check_coincidence(&mut result);
                 }
             },
             Mode::VBlank => {
@@ -174,6 +176,8 @@ impl Lcd {
                         self.ly = 0;
                         self.mode = Mode::Oam;
                     }
+
+                    self.check_coincidence(&mut result);
                 } 
             }
         }
@@ -195,6 +199,19 @@ impl Lcd {
 
         result
         
+    }
+
+    fn check_coincidence(&mut self, result: &mut StepResult) {
+        if self.stat.contains(STAT_COINCIDENCE_INT) {
+            if self.ly == self.lyc {
+                self.stat.insert(STAT_COINCIDENCE_EQUAL);
+                result.int_stat = true;
+            } else {
+                self.stat.remove(STAT_COINCIDENCE_EQUAL);
+            }
+        } else {
+            self.stat.remove(STAT_COINCIDENCE_EQUAL);
+        }
     }
 }
 
