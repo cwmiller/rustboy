@@ -56,7 +56,6 @@ const CYCLES_PER_OAM_READ: usize = 80;
 const CYCLES_PER_TRANSFER: usize = 172;
 const CYCLES_PER_HBLANK: usize = 204;
 const CYCLES_PER_LINE: usize = 456;
-pub const CYCLES_PER_FRAME: usize = 70224;
 
 const SHADE_WHITE: u8      = 0;
 const SHADE_LIGHT_GRAY: u8 = 1;
@@ -181,12 +180,12 @@ impl Lcd {
 
         // Check if a new mode has been entered during this step.
         // If so, an interrupt will be raised if the respective flag is set in the STAT register
-        if (self.mode != previous_mode) {
+        if self.mode != previous_mode {
             let flag = match self.mode {
-                VBlank   => Some(STAT_VBLANK_INT),
-                HBlank   => Some(STAT_HBLANK_INT),
-                Oam      => Some(STAT_OAM_INT),
-                Transfer => None
+                Mode::VBlank   => Some(STAT_VBLANK_INT),
+                Mode::HBlank   => Some(STAT_HBLANK_INT),
+                Mode::Oam      => Some(STAT_OAM_INT),
+                Mode::Transfer => None
             };
 
             if flag.is_some() && self.stat.contains(flag.unwrap()) {

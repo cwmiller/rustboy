@@ -118,7 +118,7 @@ impl Mapper for Mbc1 {
                 // Any value with A in the lower bits enables it
                 self.ram_enabled = (val & 0x0A) == 0x0A;
             },
-            0x2000...0x3FFFF => {
+            0x2000...0x3FFF => {
                 // Writing to this space switches ROM bank lower bits
                 self.bank_selection.set_lower(val);
             },

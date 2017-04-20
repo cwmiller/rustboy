@@ -13,7 +13,7 @@ mod lcd;
 use bus::Bus;
 use cartridge::Cartridge;
 use cpu::{Cpu, Interrupt};
-use lcd::{CYCLES_PER_FRAME, LCD_WIDTH, LCD_HEIGHT};
+use lcd::{LCD_WIDTH, LCD_HEIGHT};
 use minifb::{Key, WindowOptions, Window};
 use std::env;
 use std::fs::File;
@@ -41,12 +41,12 @@ fn run(cart: Cartridge) {
     });
 
     for i in framebuffer.iter_mut() {
-        *i = 0; // write something more funny here!
+        *i = 0;
     }
+    window.update_with_buffer(&framebuffer);
 
     let mut cpu = Cpu::new();
     let mut bus = Bus::new(cart);
-    //let mut cycles = 0;
 
     cpu.reset();
 
@@ -61,13 +61,5 @@ fn run(cart: Cartridge) {
         if result.int_stat {
             cpu.interrupt(&mut bus, Interrupt::Stat);
         }
-
-        /*
-        // Reset on frame
-        if cycles >= CYCLES_PER_FRAME {
-            cycles = 0;
-            window.update_with_buffer(&framebuffer);
-        }
-        */
     }
 }
