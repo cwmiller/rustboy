@@ -128,7 +128,7 @@ impl Mapper for Mbc1 {
             },
             0x6000...0x7FFF => {
                 // Writing to this space toggles RAM/ROM bank mode. 1 = RAM mode
-                self.bank_selection.set_mode(BankMode::from_u8(val).unwrap());
+                self.bank_selection.set_mode(BankMode::from_u8(val).unwrap_or_else(|| panic!("Unknown bank mode: {:#X}", val)));
             },
             0xA000...0xBFFF => {
                 // Write to RAM Bank

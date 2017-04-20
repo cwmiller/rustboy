@@ -27,7 +27,7 @@ fn main() {
 
     let cart = Cartridge::new(rom_data);
 
-    println!("Loaded {}", cart);
+    println!("Loaded {:?}", cart);
     run(cart);
 }
 

@@ -84,6 +84,19 @@ impl fmt::Display for Cartridge {
     }
 }
 
+impl fmt::Debug for Cartridge {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        let mapper = self.mapper_type();
+
+        write!(f, "Name: {}, Type: {:#X}, Mapper: {}, GBC: {}, SGB: {}", 
+            self.name(),
+            self.rom[0x147],
+            if mapper.is_some() { mapper.unwrap().to_string() } else { "None".to_string() },
+            if self.gbc() { "Yes" } else { "No" },
+            if self.sgb() { "Yes" } else { "No" })
+    }
+}
+
 impl Addressable for Cartridge {
     fn read(&self, addr: u16) -> u8 {
         if self.mapper.is_some() {
@@ -110,6 +123,9 @@ trait Mapper {
 }
 
 fn create_mapper(cartridge_type: u8) -> Option<Box<Mapper>> {
-    // TODO
-    Some(Box::new(Mbc1::new(0, 0)))
+    match cartridge_type {
+        0 => None,
+        1 => Some(Box::new(Mbc1::new(0, 0))),
+        _ => panic!("Cannot create mapper for unhandled cartridge type {:#X}", cartridge_type)
+    }
 }

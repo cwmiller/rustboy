@@ -148,9 +148,8 @@ impl Cpu {
 
     fn pop_stack(&mut self, bus: &Bus) -> u16 {
         let addr = self.regs.sp();
-        let pc = self.regs.pc();
         let word = &[bus.read(addr), bus.read(addr + 1)];
-        self.regs.set_pc(pc + 2);
+        self.regs.set_sp(addr + 2);
 
         LittleEndian::read_u16(word)
     }
