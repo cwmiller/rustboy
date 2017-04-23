@@ -10,6 +10,8 @@ use self::instructions as inst;
 use self::registers::*;
 use std::fmt;
 
+pub use self::instructions::decode;
+
 #[derive(PartialEq)]
 pub enum Condition {
     None,
@@ -75,7 +77,7 @@ static PREFIXED_CYCLES: &'static [usize] = &[
 ];
 
 pub struct Cpu {
-    regs: Registers,
+    pub regs: Registers,
     ime: bool,
     prefixed: bool
 }

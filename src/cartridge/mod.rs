@@ -3,6 +3,8 @@ mod mbc1;
 use bus::Addressable;
 use self::mbc1::Mbc1;
 use std::fmt;
+use std::fs::File;
+use std::io::Read;
 
 pub enum MapperType {
     Mbc1,
@@ -32,10 +34,14 @@ pub struct Cartridge {
 }
 
 impl Cartridge {
-    pub fn new(rom: Vec<u8>) -> Cartridge {
+    pub fn new(path: String) -> Cartridge {
+        let mut rom = File::open(&path).unwrap();
+        let mut rom_data: Vec<u8> = Vec::new();
+        rom.read_to_end(&mut rom_data).unwrap();
+
         Cartridge {
-            mapper: create_mapper(rom[0x147]),
-            rom: rom
+            mapper: create_mapper(rom_data[0x147]),
+            rom: rom_data
         }
     }
 

@@ -1,13 +1,14 @@
-use std::str::FromStr;
 use regex::Regex;
+use std::str::FromStr;
 
 pub enum Command {
     Continue,
+    Disassemble(u16, usize),
+    Help,
+    Memory(u16, usize),
     Quit,
     Registers,
-    Step(usize),
-    Disassemble(u16, usize),
-    Memory(u16, usize),
+    Step(usize)
 }
 
 fn parse_str(val: &str) -> usize {
@@ -31,21 +32,6 @@ impl Command {
     pub fn parse(line: &String, pc: u16) -> Result<Self, String> {
         match line.chars().nth(0).unwrap() {
             'c' => Ok(Command::Continue),
-            'q' => Ok(Command::Quit),
-            'r' => Ok(Command::Registers),
-            's' => {
-                lazy_static! {
-                    static ref RE: Regex = Regex::new(r"s(?:tep)? ?([0-9a-fx]+)?").unwrap();
-                }
-                if RE.is_match(line) {
-                    let caps = RE.captures(line).unwrap();
-                    let count = caps.get(1).map_or(2, |m| parse_str(m.as_str()));
-
-                    Ok(Command::Step(count))
-                } else {
-                    Err(String::from("Usage: s [count]"))
-                }
-            },
             'd' => {
                 lazy_static! {
                     static ref RE: Regex = Regex::new(r"d(?:is)? ?([0-9a-fx]+)? ?([0-9a-fx]+)?").unwrap();
@@ -60,6 +46,7 @@ impl Command {
                     Err(String::from("Usage: d [addr] [length]"))
                 }
             },
+            'h' => Ok(Command::Help),
             'm' => {
                 lazy_static! {
                     static ref RE: Regex = Regex::new(r"m(?:em)? ([0-9a-fx]+) ?([0-9a-fx]+)?").unwrap();
@@ -74,7 +61,21 @@ impl Command {
                     Err(String::from("Usage: m [addr] [length]"))
                 }
             }
+            'q' => Ok(Command::Quit),
+            'r' => Ok(Command::Registers),
+            's' => {
+                lazy_static! {
+                    static ref RE: Regex = Regex::new(r"s(?:tep)? ?([0-9a-fx]+)?").unwrap();
+                }
+                if RE.is_match(line) {
+                    let caps = RE.captures(line).unwrap();
+                    let count = caps.get(1).map_or(1, |m| parse_str(m.as_str()));
 
+                    Ok(Command::Step(count))
+                } else {
+                    Err(String::from("Usage: s [count]"))
+                }
+            },
             _ => Err(String::from("Unknown command"))
         }
     }
