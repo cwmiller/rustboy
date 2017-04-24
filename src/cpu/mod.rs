@@ -10,7 +10,7 @@ use self::instructions as inst;
 use self::registers::*;
 use std::fmt;
 
-pub use self::instructions::decode;
+pub use self::instructions::{decode, Instruction};
 
 #[derive(PartialEq)]
 pub enum Condition {

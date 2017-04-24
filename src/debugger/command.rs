@@ -2,35 +2,75 @@ use regex::Regex;
 use std::str::FromStr;
 
 pub enum Command {
+    AddBreakPoint(u16),
     Continue,
     Disassemble(u16, usize),
     Help,
+    ListBreakPoints,
     Memory(u16, usize),
     Quit,
+    RemoveBreakPoint(u16),
     Registers,
     Step(usize)
 }
 
 fn parse_str(val: &str) -> usize {
+    let lowered = val.to_lowercase();
+
     lazy_static! {
-        static ref RE: Regex = Regex::new(r"^0[xXb]").unwrap();
+        static ref RE: Regex = Regex::new(r"^0[xb]").unwrap();
     }
 
-    if RE.is_match(val) {
-        let prefix = &val[..2];
+    if RE.is_match(&lowered) {
+        let prefix = &lowered[..2];
         match prefix {
-            "0x" => usize::from_str_radix(&val[2..], 16),
-            "0b" => usize::from_str_radix(&val[2..], 2),
-            _ => usize::from_str(&val)
+            "0x" => usize::from_str_radix(&lowered[2..], 16),
+            "0b" => usize::from_str_radix(&lowered[2..], 2),
+            _ => usize::from_str(&lowered)
         }
     } else {
-        usize::from_str(&val)
+        usize::from_str(&lowered)
     }.unwrap()
 }
 
 impl Command {
     pub fn parse(line: &String, pc: u16) -> Result<Self, String> {
-        match line.chars().nth(0).unwrap() {
+        match line.trim().chars().nth(0).unwrap() {
+            'b' => {
+                if line.trim().len() == 1 {
+                    Ok(Command::ListBreakPoints)
+                } else {
+                    match line.chars().nth(1).unwrap() {
+                        'a' => {
+                            lazy_static! {
+                                static ref RE: Regex = Regex::new(r"ba ([0-9a-fx]+)").unwrap();
+                            }
+                            if RE.is_match(line) {
+                                let caps = RE.captures(line).unwrap();
+                                let addr = caps.get(1).map_or(0, |m| parse_str(m.as_str()) as u16);
+
+                                Ok(Command::AddBreakPoint(addr))
+                            } else {
+                                Err(String::from("Usage: ba [addr]"))
+                            }
+                        },
+                        'r' => {
+                            lazy_static! {
+                                static ref RE: Regex = Regex::new(r"br ([0-9a-fx]+)").unwrap();
+                            }
+                            if RE.is_match(line) {
+                                let caps = RE.captures(line).unwrap();
+                                let addr = caps.get(1).map_or(0, |m| parse_str(m.as_str()) as u16);
+
+                                Ok(Command::RemoveBreakPoint(addr))
+                            } else {
+                                Err(String::from("Usage: br [addr]"))
+                            }
+                        },
+                        _ => Err(String::from("Unknown command"))
+                    }
+                }
+            },
             'c' => Ok(Command::Continue),
             'd' => {
                 lazy_static! {
