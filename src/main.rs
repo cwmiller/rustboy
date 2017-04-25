@@ -13,6 +13,7 @@ mod cartridge;
 mod debugger;
 mod cpu;
 mod lcd;
+mod sound;
 
 use bus::Bus;
 use cartridge::Cartridge;

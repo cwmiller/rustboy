@@ -1,5 +1,6 @@
 use cartridge::Cartridge;
 use lcd::Lcd;
+use sound::Sound;
 
 const CARTRIDGE_ROM_START: u16 = 0;
 const CARTRIDGE_ROM_END: u16 = 0x7FFF;
@@ -24,6 +25,9 @@ const IO_VIDEO_START: u16 = 0xFF40;
 const IO_VIDEO_END: u16 = 0xFF4B;
 
 pub const IO_IF_ADDR: u16 = 0xFF0F;
+
+const IO_SOUND_START: u16 = 0xFF10;
+const IO_SOUND_END: u16 = 0xFF3F;
 
 const HIGH_RAM_START: u16 = 0xFF80;
 const HIGH_RAM_END: u16 = 0xFFFE;
@@ -66,6 +70,7 @@ pub struct Bus {
     io_if: u8,
     high_ram: Ram,
     pub lcd: Lcd,
+    sound: Sound,
     work_ram: Ram,
 }
 
@@ -77,6 +82,7 @@ impl Bus {
             io_if: 0,
             high_ram: Ram::new(HIGH_RAM_START, HIGH_RAM_SIZE),
             lcd: Lcd::new(),
+            sound: Sound::default(),
             work_ram: Ram::new(WORK_RAM_START, WORK_RAM_SIZE)
         }
     }
@@ -101,6 +107,8 @@ impl Addressable for Bus {
             IO_VIDEO_START...IO_VIDEO_END => self.lcd.read(addr),
             // 0xFF0F IF IO port
             IO_IF_ADDR => self.io_if,
+            // 0xFF10 - 0xFF3F Sound IO ports
+            IO_SOUND_START...IO_SOUND_END => self.sound.read(addr),
             // 0xFF80 - 0xFFFE High RAM
             HIGH_RAM_START...HIGH_RAM_END => self.high_ram.read(addr),
             // 0xFFFF IE IO port
@@ -127,6 +135,8 @@ impl Addressable for Bus {
             IO_VIDEO_START...IO_VIDEO_END => self.lcd.write(addr, val),
             // 0xFF0F IF IO port
             IO_IF_ADDR => self.io_if = val,
+            // 0xFF10 - 0xFF3F Sound IO ports
+            IO_SOUND_START...IO_SOUND_END => self.sound.write(addr, val),
             // 0xFF80 - 0xFFFE High RAM
             HIGH_RAM_START...HIGH_RAM_END => self.high_ram.write(addr, val),
             // 0xFFFF IE IO port
