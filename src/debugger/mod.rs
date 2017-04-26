@@ -5,6 +5,7 @@ use bus::{Addressable, Bus};
 use cpu::{Cpu, Instruction, decode};
 use std::collections::HashSet;
 use std::io::{stdin, stdout, Write};
+use std::iter;
 use std::process;
 
 enum State {
@@ -113,7 +114,6 @@ impl Debugger {
             let decoded_instruction;
             let mut length = 1;
             
-
             {
                 let mut imm8 = || { 
                     let byte = bus.read(addr.wrapping_add(length));
@@ -126,12 +126,14 @@ impl Debugger {
 
             let mut raw = "0x".to_string();
             for i in 0..length {
-                raw = raw + &format!("{:02X}", bus.read(addr + i));
+                raw = raw + &format!("{:02X}", bus.read(base_addr + i));
             }
 
             if decoded_instruction.is_some() {
                 let instruction = decoded_instruction.unwrap();
-                println!("{:#05X}\t{}\t\t{}", base_addr, raw, instruction);
+                let padding = iter::repeat(" ").take(10 - (length as usize * 2)).collect::<String>();
+                
+                println!("{:#06X}\t{}{}{}", base_addr, raw, padding, instruction);
 
                 prefixed = match instruction {
                     Instruction::Prefix => true,
