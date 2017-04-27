@@ -71,14 +71,14 @@ fn start_emu(cart: Cartridge) {
         }
 
         let cycles = cpu.step(&mut bus);
-        let result = bus.lcd.step(cycles);
+        let lcd_result = bus.lcd.step(cycles);
 
-        if result.int_vblank {
+        if lcd_result.int_vblank {
             cpu.interrupt(&mut bus, Interrupt::VBlank);
             window.update_with_buffer(&framebuffer);
         }
 
-        if result.int_stat {
+        if lcd_result.int_stat {
             cpu.interrupt(&mut bus, Interrupt::Stat);
         }
     }

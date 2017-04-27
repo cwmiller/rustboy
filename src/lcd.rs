@@ -126,7 +126,6 @@ impl Lcd {
 
         self.mode_cycles = self.mode_cycles + cycles;
 
-        // Current mode is stored in the lower two bits of the STAT register
         match self.mode {
             Mode::Oam => {
                 // Process starts with the LCD controller reading information from OAM.

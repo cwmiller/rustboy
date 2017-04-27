@@ -107,6 +107,7 @@ impl Cpu {
 
         let pc = self.regs.pc();
         let opcode = bus.read(pc);
+        let mut length = 1;
         
         let cycles = 
             if self.prefixed { 
@@ -115,24 +116,19 @@ impl Cpu {
                 CYCLES[opcode as usize]
             };
 
-        let decoded_instruction;
-        let mut length = 1;
-
-        {
-            let mut imm8 = || { 
+        let decoded_instruction = {
+            let mut next = || {
                 let byte = bus.read(pc.wrapping_add(length));
                 length = length + 1; 
                 byte
             };
 
-            decoded_instruction = inst::decode(opcode, self.prefixed, &mut imm8);
-        }
+            inst::decode(opcode, self.prefixed, &mut next)
+        };
 
         self.regs.set_pc(pc + length);
 
-        if decoded_instruction.is_some() {
-            let instruction = decoded_instruction.unwrap();
-
+        if let Some(instruction) = decoded_instruction {
             //println!("{:#06X}: {}", pc, instruction);
             inst::execute(self, bus, instruction);
             //println!("{:?}", self);

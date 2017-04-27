@@ -1,6 +1,7 @@
 use regex::Regex;
 use std::str::FromStr;
 
+#[derive(Copy, Clone)]
 pub enum Command {
     AddBreakPoint(u16),
     Continue,
@@ -22,8 +23,7 @@ fn parse_str(val: &str) -> usize {
     }
 
     if RE.is_match(&lowered) {
-        let prefix = &lowered[..2];
-        match prefix {
+        match &lowered[..2] {
             "0x" => usize::from_str_radix(&lowered[2..], 16),
             "0b" => usize::from_str_radix(&lowered[2..], 2),
             _ => usize::from_str(&lowered)
@@ -35,18 +35,20 @@ fn parse_str(val: &str) -> usize {
 
 impl Command {
     pub fn parse(line: &String, pc: u16) -> Result<Self, String> {
-        match line.trim().chars().nth(0).unwrap() {
+        let trimmed = line.trim();
+
+        match trimmed.chars().nth(0).unwrap() {
             'b' => {
-                if line.trim().len() == 1 {
+                if trimmed.len() == 1 {
                     Ok(Command::ListBreakPoints)
                 } else {
-                    match line.chars().nth(1).unwrap() {
+                    match trimmed.chars().nth(1).unwrap() {
                         'a' => {
                             lazy_static! {
                                 static ref RE: Regex = Regex::new(r"ba ([0-9a-fx]+)").unwrap();
                             }
-                            if RE.is_match(line) {
-                                let caps = RE.captures(line).unwrap();
+                            if RE.is_match(trimmed) {
+                                let caps = RE.captures(trimmed).unwrap();
                                 let addr = caps.get(1).map_or(0, |m| parse_str(m.as_str()) as u16);
 
                                 Ok(Command::AddBreakPoint(addr))
@@ -58,8 +60,8 @@ impl Command {
                             lazy_static! {
                                 static ref RE: Regex = Regex::new(r"br ([0-9a-fx]+)").unwrap();
                             }
-                            if RE.is_match(line) {
-                                let caps = RE.captures(line).unwrap();
+                            if RE.is_match(trimmed) {
+                                let caps = RE.captures(trimmed).unwrap();
                                 let addr = caps.get(1).map_or(0, |m| parse_str(m.as_str()) as u16);
 
                                 Ok(Command::RemoveBreakPoint(addr))
@@ -76,8 +78,8 @@ impl Command {
                 lazy_static! {
                     static ref RE: Regex = Regex::new(r"d(?:is)? ?([0-9a-fx]+)? ?([0-9a-fx]+)?").unwrap();
                 }
-                if RE.is_match(line) {
-                    let caps = RE.captures(line).unwrap();
+                if RE.is_match(trimmed) {
+                    let caps = RE.captures(trimmed).unwrap();
                     let addr = caps.get(1).map_or(pc, |m| parse_str(m.as_str()) as u16);
                     let length = caps.get(2).map_or(10, |m| parse_str(m.as_str()));
 
@@ -91,8 +93,8 @@ impl Command {
                 lazy_static! {
                     static ref RE: Regex = Regex::new(r"m(?:em)? ([0-9a-fx]+) ?([0-9a-fx]+)?").unwrap();
                 }
-                if RE.is_match(line) {
-                    let caps = RE.captures(line).unwrap();
+                if RE.is_match(trimmed) {
+                    let caps = RE.captures(trimmed).unwrap();
                     let addr = caps.get(1).map_or(0, |m| parse_str(m.as_str()) as u16);
                     let length = caps.get(2).map_or(1, |m| parse_str(m.as_str()));
 
@@ -107,8 +109,8 @@ impl Command {
                 lazy_static! {
                     static ref RE: Regex = Regex::new(r"s(?:tep)? ?([0-9a-fx]+)?").unwrap();
                 }
-                if RE.is_match(line) {
-                    let caps = RE.captures(line).unwrap();
+                if RE.is_match(trimmed) {
+                    let caps = RE.captures(trimmed).unwrap();
                     let count = caps.get(1).map_or(1, |m| parse_str(m.as_str()));
 
                     Ok(Command::Step(count))
