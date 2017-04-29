@@ -245,7 +245,7 @@ impl Addressable for Lcd {
             },
             ADDR_SCY => self.scy = val,
             ADDR_SCX => self.scx = val,
-            //ADDR_LY => self.ly = val,
+            ADDR_LY => (), // read-only
             ADDR_LYC => self.lyc = val,
             ADDR_DMA => println!("DMA unimplemented"),
             ADDR_BGP => self.bgp = Pallete(val),

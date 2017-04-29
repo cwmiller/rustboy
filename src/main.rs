@@ -13,7 +13,9 @@ mod cartridge;
 mod debugger;
 mod cpu;
 mod lcd;
+mod serial;
 mod sound;
+mod timer;
 
 use bus::Bus;
 use cartridge::Cartridge;
@@ -71,7 +73,12 @@ fn start_emu(cart: Cartridge) {
         }
 
         let cycles = cpu.step(&mut bus);
+        let timer_result = bus.timer.step(cycles);
         let lcd_result = bus.lcd.step(cycles);
+
+        if timer_result.interrupt {
+            cpu.interrupt(&mut bus, Interrupt::Timer);
+        }
 
         if lcd_result.int_vblank {
             cpu.interrupt(&mut bus, Interrupt::VBlank);

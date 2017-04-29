@@ -1,6 +1,8 @@
 use cartridge::Cartridge;
 use lcd::Lcd;
+use serial::Serial;
 use sound::Sound;
+use timer::Timer;
 
 const CARTRIDGE_ROM_START: u16 = 0;
 const CARTRIDGE_ROM_END: u16 = 0x7FFF;
@@ -20,6 +22,12 @@ const ECHO_RAM_END: u16 = 0xFDFF;
 
 pub const OAM_START: u16 = 0xFE00;
 pub const OAM_END: u16 = 0xFE9F;
+
+const IO_SERIAL_START: u16 = 0xFF01;
+const IO_SERIAL_END: u16 = 0xFF02;
+
+const IO_TIMER_START: u16 = 0xFF04;
+const IO_TIMER_END: u16 = 0xFF07;
 
 const IO_VIDEO_START: u16 = 0xFF40;
 const IO_VIDEO_END: u16 = 0xFF4B;
@@ -70,7 +78,9 @@ pub struct Bus {
     io_if: u8,
     high_ram: Ram,
     pub lcd: Lcd,
+    serial: Serial,
     sound: Sound,
+    pub timer: Timer,
     work_ram: Ram,
 }
 
@@ -82,7 +92,9 @@ impl Bus {
             io_if: 0,
             high_ram: Ram::new(HIGH_RAM_START, HIGH_RAM_SIZE),
             lcd: Lcd::new(),
+            serial: Serial::default(),
             sound: Sound::default(),
+            timer: Timer::new(),
             work_ram: Ram::new(WORK_RAM_START, WORK_RAM_SIZE)
         }
     }
@@ -103,6 +115,10 @@ impl Addressable for Bus {
             ECHO_RAM_START...ECHO_RAM_END => self.work_ram.read(addr - 0x2000),
             // 0xFE00 - 0xFE9F Sprite OAM
             OAM_START...OAM_END => self.lcd.read(addr),
+            // 0xFF01 - 0xFF02 Serial IO ports
+            IO_SERIAL_START...IO_SERIAL_END => self.serial.read(addr),
+            // 0xFF04 - 0xFF07 Timer IO ports
+            IO_TIMER_START...IO_TIMER_END => self.timer.read(addr),
             // 0xFF40 - 0xFE9F Video IO ports
             IO_VIDEO_START...IO_VIDEO_END => self.lcd.read(addr),
             // 0xFF0F IF IO port
@@ -131,6 +147,10 @@ impl Addressable for Bus {
             ECHO_RAM_START...ECHO_RAM_END => self.work_ram.write(addr - 0x2000, val),
             // 0xFE00 - 0xFE9F Sprite OAM
             OAM_START...OAM_END => self.lcd.write(addr, val),
+            // 0xFF01 - 0xFF02 Serial IO ports
+            IO_SERIAL_START...IO_SERIAL_END => self.serial.write(addr, val),
+            // 0xFF04 - 0xFF07 Timer IO ports
+            IO_TIMER_START...IO_TIMER_END => self.timer.write(addr, val),
             // 0xFF40 - 0xFE9F Video IO ports
             IO_VIDEO_START...IO_VIDEO_END => self.lcd.write(addr, val),
             // 0xFF0F IF IO port
