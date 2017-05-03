@@ -1,5 +1,8 @@
-use bus::{Addressable, OAM_START, OAM_END, VIDEO_RAM_START, VIDEO_RAM_END};
+use bus::{Bus, Addressable, OAM_START, OAM_END, VIDEO_RAM_START, VIDEO_RAM_END};
 use enum_primitive::FromPrimitive;
+
+pub const BUFFER_WIDTH: usize = 256;
+pub const BUFFER_HEIGHT: usize = 256;
 
 pub const LCD_WIDTH: usize = 160;
 pub const LCD_HEIGHT: usize = 144;
@@ -19,14 +22,14 @@ const ADDR_WX: u16   = 0xFF4B;
 
 bitflags! {
     flags Lcdc: u8 {
-        const LCDC_ENABLED          = 0b1000_0000,
-        const LCDC_TILE_TBL_9C      = 0b0100_0000,
-        const LCDC_WIN_ENABLED      = 0b0010_0000,
-        const LCDC_SIGNED_TILE_DATA = 0b0001_0000,
-        const LCDC_BG_TILE_TBL_9C   = 0b0000_1000,
-        const LCDC_16PX_SPRITE      = 0b0000_0100,
-        const LCDC_SPRITE_DISPLAY   = 0b0000_0010,
-        const LCDC_BG_DISPLAY       = 0b0000_0001
+        const LCDC_ENABLED            = 0b1000_0000,
+        const LCDC_WIN_TILE_9C        = 0b0100_0000,
+        const LCDC_WIN_DISPLAY        = 0b0010_0000,
+        const LCDC_UNSIGNED_TILE_DATA = 0b0001_0000,
+        const LCDC_BG_TILE_9C         = 0b0000_1000,
+        const LCDC_16PX_SPRITE        = 0b0000_0100,
+        const LCDC_SPRITE_DISPLAY     = 0b0000_0010,
+        const LCDC_BG_DISPLAY         = 0b0000_0001
     }
 }
 
@@ -120,7 +123,7 @@ impl Lcd {
         }
     }
 
-    pub fn step(&mut self, cycles: usize) -> StepResult {
+    pub fn step(&mut self, cycles: usize, framebuffer: &mut [u32]) -> StepResult {
         let mut result = StepResult::default();
         let previous_mode = self.mode;
 
@@ -157,6 +160,14 @@ impl Lcd {
                     if self.ly == 144 { 
                         self.mode = Mode::VBlank;
                         result.int_vblank = true;
+
+                        self.clear_framebuffer(framebuffer);
+
+                        if self.lcdc.contains(LCDC_BG_DISPLAY) {
+                            self.draw_background(framebuffer);
+                        }
+
+                        self.draw_borders(framebuffer);
                     } else { 
                         self.mode = Mode::Oam;
                     };
@@ -210,6 +221,91 @@ impl Lcd {
             }
         } else {
             self.stat.remove(STAT_COINCIDENCE_EQUAL);
+        }
+    }
+
+    fn clear_framebuffer(&self, framebuffer: &mut [u32]) {
+        for idx in 0..BUFFER_HEIGHT*BUFFER_WIDTH {
+            framebuffer[idx] = 0xFFFFFF;
+        }
+    }
+
+    fn draw_background(&self, framebuffer: &mut [u32]) {
+        let map_addr_base = if self.lcdc.contains(LCDC_BG_TILE_9C) {
+            0x9C00
+        } else {
+            0x9800
+        };
+
+        let tile_addr_base = if self.lcdc.contains(LCDC_UNSIGNED_TILE_DATA) {
+            0x8000
+        } else {
+            0x9000
+        };
+
+        for y in 0..32 {
+            for x in 0..32 {
+                let fb_top_left_y = y as usize * 8;
+                let fb_top_left_x = x as usize * 8;
+
+                let tile_idx = self.read(map_addr_base + ((y * 32) + x)) as u16;
+                let tile_addr = tile_addr_base + tile_idx * 16;
+                let tile = (0..16).map(|idx| self.read(tile_addr + (idx as u16))).collect::<Vec<u8>>();
+
+                self.draw_tile(framebuffer, &tile, fb_top_left_x, fb_top_left_y);
+            }
+        }
+    }
+
+    fn draw_tile(&self, framebuffer: &mut [u32], tile: &Vec<u8>, x: usize, y: usize) {
+        for tile_y in 0..8 {
+            let upper_byte = tile[(tile_y * 2) + 1];
+            let lower_byte = tile[tile_y * 2];
+
+            for tile_x in 0..8 {
+                let fb_idx = ((y + tile_y) * BUFFER_WIDTH) + x + tile_x;
+                let shift = 7 - tile_x;
+                let mask = 1 << shift;
+                let upper_bit = (upper_byte & mask) >> shift;
+                let lower_bit = (lower_byte & mask) >> shift;
+                let shade = (upper_bit << 1) | lower_bit;
+
+                let color = match shade {
+                    SHADE_WHITE => 0xFFFFFF,
+                    SHADE_LIGHT_GRAY => 0xDDDDDD,
+                    SHADE_DARK_GRAY => 0xCCCCCC,
+                    SHADE_BLACK => 0x000000,
+                    _ => 0xFFFFFF
+                };
+
+                framebuffer[fb_idx] = color;
+            }
+        }
+    }
+
+    fn draw_borders(&self, framebuffer: &mut [u32]) {
+        let scy = self.scy as usize;
+        let scx = self.scx as usize;
+
+        for y_offset in 0..LCD_HEIGHT {
+            let y = if scy + y_offset >= LCD_HEIGHT {
+                (scy + y_offset) - LCD_HEIGHT
+            } else {
+                scy + y_offset
+            };
+
+            for x_offset in 0..LCD_WIDTH {
+                let x = if scx + x_offset >= LCD_WIDTH {
+                    (scx + x_offset) - LCD_WIDTH
+                } else {
+                    scx + x_offset
+                };
+
+                if y_offset == 0 || y_offset == LCD_HEIGHT - 1 || x_offset == 0 || x_offset == LCD_WIDTH - 1 {
+                    let idx = (y * BUFFER_WIDTH) + x;
+                    framebuffer[idx] = 0xFF0000;
+                }
+            }
         }
     }
 }

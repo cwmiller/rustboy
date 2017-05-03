@@ -21,8 +21,8 @@ use bus::Bus;
 use cartridge::Cartridge;
 use cpu::{Cpu, Interrupt};
 use debugger::Debugger;
-use lcd::{LCD_WIDTH, LCD_HEIGHT};
-use minifb::{Key, WindowOptions, Window};
+use lcd::{BUFFER_WIDTH, BUFFER_HEIGHT};
+use minifb::{Key, Scale, WindowOptions, Window};
 use std::env;
 use std::process;
 
@@ -40,16 +40,21 @@ fn main() {
 }
 
 fn start_emu(cart: Cartridge) {
-    let mut framebuffer: Vec<u32> = vec![0; LCD_WIDTH * LCD_HEIGHT];
+    //let mut framebuffer: Vec<u32> = vec![0; BUFFER_WIDTH * BUFFER_HEIGHT];
+    let mut framebuffer = [0; BUFFER_WIDTH * BUFFER_HEIGHT];
+
     let mut window = Window::new("Rustboy",
-                                 LCD_WIDTH,
-                                 LCD_HEIGHT,
-                                 WindowOptions::default()).unwrap_or_else(|e| {
+                                 BUFFER_WIDTH,
+                                 BUFFER_HEIGHT,
+                                 WindowOptions {
+                                     scale: Scale::X1,
+                                     ..WindowOptions::default()
+                                 }).unwrap_or_else(|e| {
         panic!("{}", e);
     });
 
     for i in framebuffer.iter_mut() {
-        *i = 0;
+        *i = 0xFFFFFF;
     }
     window.update_with_buffer(&framebuffer);
 
@@ -74,7 +79,7 @@ fn start_emu(cart: Cartridge) {
 
         let cycles = cpu.step(&mut bus);
         let timer_result = bus.timer.step(cycles);
-        let lcd_result = bus.lcd.step(cycles);
+        let lcd_result = bus.lcd.step(cycles, &mut framebuffer);
 
         if timer_result.interrupt {
             cpu.interrupt(&mut bus, Interrupt::Timer);

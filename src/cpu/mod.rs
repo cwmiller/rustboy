@@ -93,9 +93,9 @@ impl Cpu {
 
     pub fn reset(&mut self) {
         self.regs.set_af(0x01B0);
-        self.regs.set_bc(0x1300);
-        self.regs.set_de(0xD800);
-        self.regs.set_hl(0x4D01);
+        self.regs.set_bc(0x0013);
+        self.regs.set_de(0x00D8);
+        self.regs.set_hl(0x014D);
         self.regs.set_sp(0xFFFE);
         self.regs.set_pc(0x100);
         self.ime = true;
