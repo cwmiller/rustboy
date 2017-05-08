@@ -1,4 +1,4 @@
-use bus::{Bus, Addressable, OAM_START, OAM_END, VIDEO_RAM_START, VIDEO_RAM_END};
+use bus::{Addressable, OAM_START, OAM_END, VIDEO_RAM_START, VIDEO_RAM_END};
 use enum_primitive::FromPrimitive;
 
 pub const BUFFER_WIDTH: usize = 256;

@@ -1,9 +1,8 @@
 use cpu::Cpu;
 use cpu::addressing::*;
+use cpu::instructions::*;
 use bus::Bus;
 use cartridge::Cartridge;
-
-use super::*;
 
 // RLCA tests
 
@@ -508,7 +507,7 @@ fn srl_zero_result() {
 fn bit_zero() {
     let mut cpu = Cpu::new();
     let mut bus = Bus::new(Cartridge::from_vec(vec![0; 65536]));
-    let mut reg = RegisterAddressing(Register::A);
+    let reg = RegisterAddressing(Register::A);
 
     cpu.regs.set_f(0b1111 << 4);
     cpu.regs.set_a(0b11101111);
@@ -522,7 +521,7 @@ fn bit_zero() {
 fn bit_not_zero() {
     let mut cpu = Cpu::new();
     let mut bus = Bus::new(Cartridge::from_vec(vec![0; 65536]));
-    let mut reg = RegisterAddressing(Register::A);
+    let reg = RegisterAddressing(Register::A);
 
     cpu.regs.set_f(0b1111 << 4);
     cpu.regs.set_a(0b00010000);
@@ -538,7 +537,7 @@ fn bit_not_zero() {
 fn res_bit() {
     let mut cpu = Cpu::new();
     let mut bus = Bus::new(Cartridge::from_vec(vec![0; 65536]));
-    let mut reg = RegisterAddressing(Register::A);
+    let reg = RegisterAddressing(Register::A);
 
     cpu.regs.set_a(255);
 
@@ -553,7 +552,7 @@ fn res_bit() {
 fn set_bit() {
     let mut cpu = Cpu::new();
     let mut bus = Bus::new(Cartridge::from_vec(vec![0; 65536]));
-    let mut reg = RegisterAddressing(Register::A);
+    let reg = RegisterAddressing(Register::A);
 
     cpu.regs.set_a(0);
 

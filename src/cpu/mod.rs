@@ -146,8 +146,8 @@ impl Cpu {
 
     fn pop_stack(&mut self, bus: &Bus) -> u16 {
         let addr = self.regs.sp();
-        let word = &[bus.read(addr), bus.read(addr + 1)];
-        self.regs.set_sp(addr + 2);
+        let word = &[bus.read(addr), bus.read(addr.wrapping_add(1))];
+        self.regs.set_sp(addr.wrapping_add(2));
 
         LittleEndian::read_u16(word)
     }
@@ -155,10 +155,10 @@ impl Cpu {
     fn push_stack(&mut self, bus: &mut Bus, val: u16) {
         let addr = self.regs.sp();
         
-        bus.write(addr - 2, (val & 0x00FF) as u8);
-        bus.write(addr - 1, ((val >> 8) & 0x00FF) as u8);
+        bus.write(addr.wrapping_sub(2), (val & 0x00FF) as u8);
+        bus.write(addr.wrapping_sub(1), ((val >> 8) & 0x00FF) as u8);
 
-        self.regs.set_sp(addr - 2);
+        self.regs.set_sp(addr.wrapping_sub(2));
     }
 
     fn condition_met(&self, cond: Condition) -> bool {
