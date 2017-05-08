@@ -22,7 +22,6 @@ pub fn ldhl(cpu: &mut Cpu, bus: &mut Bus, src: &AddressingMode<u8>) {
         cpu.regs.set_hl(sp.wrapping_sub(offset.abs() as u16));
     }
 
-    // TODO: I don't think this is right
     let flags =
         ((((sp & 0xF) + (immediate  & 0xF)) & 0x10) as u8) << 1 // H
         | if sp.wrapping_add(immediate) < sp                    // C
