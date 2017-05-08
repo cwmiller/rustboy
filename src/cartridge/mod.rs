@@ -34,14 +34,18 @@ pub struct Cartridge {
 }
 
 impl Cartridge {
-    pub fn new(path: String) -> Cartridge {
+    pub fn new(path: String) -> Self {
         let mut rom = File::open(&path).unwrap();
         let mut rom_data: Vec<u8> = Vec::new();
         rom.read_to_end(&mut rom_data).unwrap();
 
+        Self::from_vec(rom_data)
+    }
+
+    pub fn from_vec(data: Vec<u8>) -> Self {
         Cartridge {
-            mapper: create_mapper(rom_data[0x147]),
-            rom: rom_data
+            mapper: create_mapper(data[0x147]),
+            rom: data
         }
     }
 

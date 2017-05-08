@@ -16,20 +16,18 @@ pub enum Command {
 }
 
 fn parse_str(val: &str) -> usize {
-    let lowered = val.to_lowercase();
-
     lazy_static! {
         static ref RE: Regex = Regex::new(r"^0[xb]").unwrap();
     }
 
-    if RE.is_match(&lowered) {
-        match &lowered[..2] {
-            "0x" => usize::from_str_radix(&lowered[2..], 16),
-            "0b" => usize::from_str_radix(&lowered[2..], 2),
-            _ => usize::from_str(&lowered)
+    if RE.is_match(val) {
+        match &val[..2] {
+            "0x" => usize::from_str_radix(&val[2..], 16),
+            "0b" => usize::from_str_radix(&val[2..], 2),
+            _ => usize::from_str(val)
         }
     } else {
-        usize::from_str(&lowered)
+        usize::from_str(val)
     }.unwrap()
 }
 
@@ -45,7 +43,7 @@ impl Command {
                     match trimmed.chars().nth(1).unwrap() {
                         'a' => {
                             lazy_static! {
-                                static ref RE: Regex = Regex::new(r"ba ([0-9a-fx]+)").unwrap();
+                                static ref RE: Regex = Regex::new(r"ba ([0-9a-fA-Fx]+)").unwrap();
                             }
                             if RE.is_match(trimmed) {
                                 let caps = RE.captures(trimmed).unwrap();

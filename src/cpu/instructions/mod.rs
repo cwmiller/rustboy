@@ -4,6 +4,9 @@ mod loads;
 mod math;
 mod misc;
 
+#[cfg(test)]
+mod tests;
+
 pub use self::bits::*;
 pub use self::jumps::*;
 pub use self::loads::*;
