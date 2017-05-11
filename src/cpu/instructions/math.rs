@@ -10,7 +10,7 @@ pub fn add_8(cpu: &mut Cpu, bus: &mut Bus, src: &AddressingMode<u8>) {
     let sum = val.wrapping_add(inc);
     let flags = 
         if sum == 0 { FLAG_Z } else { 0 }           // Z
-        | (((val & 0xF) + (inc & 0xF)) & 0x10) << 1 // H
+        | (((val & 0xF) + (inc & 0xF)) & 0x10) << 1  // H
         | if sum < val { FLAG_C } else { 0 };       // C
 
     cpu.regs.set_a(sum);
@@ -26,13 +26,12 @@ pub fn add_16(cpu: &mut Cpu, bus: &mut Bus, dest: &AddressingMode<u16>, src: &Ad
 
     dest.write(cpu, bus, dest_val.wrapping_add(src_val));
 
-    let src_high = ((src_val & 0xF0) >> 8) as u8;
-    let dest_high = ((dest_val & 0xF0) >> 8) as u8;
-
     let flags = 
-        (cpu.regs.f() & FLAG_Z)                                 // Z
-        | (((dest_high & 0xF) + (src_high & 0xF)) & 0x10) << 1  // H
-        | if dest_val.wrapping_add(src_val) < src_val           // C
+        (cpu.regs.f() & FLAG_Z)                                                 // Z
+        | if (((dest_val & 0xFFF) + (src_val & 0xFFF)) & 0x1000) == 0x1000      // H
+            { FLAG_H }
+            else { 0 }
+        | if dest_val.wrapping_add(src_val) < src_val                           // C
             { FLAG_C }
             else { 0 };
 
@@ -53,10 +52,11 @@ pub fn add_sp(cpu: &mut Cpu, bus: &mut Bus, src: &AddressingMode<u8>) {
         cpu.regs.set_sp(current.wrapping_sub(val.abs() as u16));
     }
 
-    // TODO: I don't think this is right
     let flags =
-        ((((current & 0xF) + (unsigned  & 0xF)) & 0x10) as u8) << 1    // H
-        | if current.wrapping_add(unsigned) < current                  // C
+        if ((current & 0xFFF) + (unsigned & 0xFFF)) & 0x1000 == 0x1000  // H
+            { FLAG_H }
+            else { 0 }
+        | if current.wrapping_add(unsigned) < current                   // C
             { FLAG_C } 
             else { 0 };
 
@@ -77,7 +77,7 @@ pub fn adc(cpu: &mut Cpu, bus: &mut Bus, src: &AddressingMode<u8>) {
 
     let flags = 
         if sum == 0 { FLAG_Z } else { 0 }           // Z
-        | (((val & 0xF) + (inc & 0xF)) & 0x10) << 1 // H
+        | (((val & 0xF) + (inc & 0xF)) & 0x10) << 1  // H
         | if sum < val { FLAG_C } else { 0 };       // C
 
     cpu.regs.set_a(sum);
@@ -92,10 +92,10 @@ pub fn sub(cpu: &mut Cpu, bus: &mut Bus, src: &AddressingMode<u8>) {
     let dec = src.read(cpu, bus);
     let diff = val.wrapping_sub(dec);
     let flags = 
-        if diff == 0 { FLAG_Z} else { 0 }                       // Z
-        | FLAG_N                                                // N
-        | if (val & 0xF0) > (dec & 0xF0) { FLAG_H } else { 0 }  // H
-        | if diff > val { FLAG_C } else { 0 };                  // C
+        if diff == 0 { FLAG_Z } else { 0 }                      // Z
+        | FLAG_N                                                 // N
+        | if (val & 0xF) < (dec & 0xF) { FLAG_H } else { 0 }    // H
+        | if val < dec { FLAG_C } else { 0 };                   // C
 
     cpu.regs.set_a(diff);
     cpu.regs.set_f(flags);
@@ -115,9 +115,9 @@ pub fn sbc(cpu: &mut Cpu, bus: &mut Bus, src: &AddressingMode<u8>) {
 
     let flags =
         if diff == 0 { FLAG_Z } else { 0 }                      // Z
-        | FLAG_N                                                // N
-        | if (val & 0xF0) > (dec & 0xF0) { FLAG_H } else { 0 }  // H
-        | if diff > val { FLAG_C } else { 0 };                  // C
+        | FLAG_N                                                 // N
+        | if (val & 0xF) < (dec & 0xF) { FLAG_H } else { 0 }    // H
+        | if val < dec { FLAG_C } else { 0 };                   // C
 
     cpu.regs.set_a(diff);
     cpu.regs.set_f(flags);
@@ -132,7 +132,7 @@ pub fn and(cpu: &mut Cpu, bus: &mut Bus, src: &AddressingMode<u8>) {
     let res = existing & val;
     let flags =
         if res == 0 { FLAG_Z } else { 0 }   // Z
-        | FLAG_H;                           // H
+        | FLAG_H;                            // H
 
     cpu.regs.set_a(res);
     cpu.regs.set_f(flags);
@@ -166,14 +166,15 @@ pub fn or(cpu: &mut Cpu, bus: &mut Bus, src: &AddressingMode<u8>) {
 // Flags affected: Z, N, H, C
 #[inline(always)]
 pub fn cp(cpu: &mut Cpu, bus: &mut Bus, src: &AddressingMode<u8>) {
-    let existing = cpu.regs.a();
-    let val = src.read(cpu, bus);
+    let val = cpu.regs.a();
+    let dec = src.read(cpu, bus);
+    let diff = val.wrapping_sub(dec);
 
     let flags =
-        if existing == val { FLAG_Z } else { 0 }                    // Z
-        | FLAG_N                                                    // N
-        | if (existing & 0xF0) > (val & 0xF0) { FLAG_H } else { 0 } // H
-        | if existing < val { FLAG_C } else { 0 };                  // C
+        if diff == 0 { FLAG_Z } else { 0 }                      // Z
+        | FLAG_N                                                 // N
+        | if (val & 0xF) < (dec & 0xF) { FLAG_H } else { 0 }    // H
+        | if val < dec { FLAG_C } else { 0 };                   // C
 
     cpu.regs.set_f(flags);
 }
@@ -189,8 +190,8 @@ pub fn inc_8(cpu: &mut Cpu, bus: &mut Bus, dest: &AddressingMode<u8>) {
 
     let flags = 
         (if increased == 0 { FLAG_Z } else { 0 })   // Z
-        | (((val & 0xF) + 1) & 0x10) << 1           // H
-        | cpu.regs.f() & FLAG_C;                    // C
+        | (((val & 0xF) + 1) & 0x10) << 1            // H
+        | cpu.regs.f() & FLAG_C;                     // C
 
     cpu.regs.set_f(flags);
 }
@@ -206,9 +207,9 @@ pub fn dec_8(cpu: &mut Cpu, bus: &mut Bus, dest: &AddressingMode<u8>) {
 
     let flags =
         (if decreased == 0 { FLAG_Z } else { 0 })   // Z
-        | FLAG_N                                    // N
-        | if val > 0 { FLAG_H } else { 0 }          // H
-        | cpu.regs.f() & FLAG_C;                    // C
+        | FLAG_N                                     // N
+        | if val & 0xF == 0 { FLAG_H } else { 0 }   // H
+        | cpu.regs.f() & FLAG_C;                     // C
 
     cpu.regs.set_f(flags);
 }
@@ -229,7 +230,7 @@ pub fn dec_16(cpu: &mut Cpu, bus: &mut Bus, dest: &AddressingMode<u16>) {
 
 // DAA
 // Flags affected: Z, H, C
-// Based off from http://forums.nesdev.com/viewtopic.php?t=9088
+// Based off of http://forums.nesdev.com/viewtopic.php?t=9088
 #[inline(always)]
 pub fn daa(cpu: &mut Cpu) {
     let mut a = cpu.regs.a() as u16;
@@ -244,7 +245,7 @@ pub fn daa(cpu: &mut Cpu) {
         }
     } else {
         if cpu.regs.has_flag(FLAG_H) || (a & 0x0F) > 9 {
-            a = a + 0x06
+            a = a + 0x06;
         }
 
         if cpu.regs.has_flag(FLAG_C) || a > 0x9F {
@@ -252,12 +253,12 @@ pub fn daa(cpu: &mut Cpu) {
         }
     }
 
-    a = a & 0xFF;
-
     let flags = 
-        if a == 0 { FLAG_C } else { 0 }                     // Z
-        | cpu.regs.f() & FLAG_N                             // N
+        if (a & 0xFF) == 0 { FLAG_Z } else { 0 }            // Z
+        | cpu.regs.f() & FLAG_N                              // N
         | if (a & 0x100) == 0x100 { FLAG_C } else { 0 };    // C
+
+    a = a & 0xFF;
 
     cpu.regs.set_f(flags);
     cpu.regs.set_a(a as u8);
@@ -275,7 +276,7 @@ pub fn scf(cpu: &mut Cpu) {
 // Flags affected: N, H, C
 #[inline(always)]
 pub fn ccf(cpu: &mut Cpu) {
-    let flags = (cpu.regs.f() & FLAG_Z) ^ FLAG_C;
+    let flags = (cpu.regs.f() & FLAG_Z) | ((cpu.regs.f() ^ FLAG_C) & FLAG_C);
     cpu.regs.set_f(flags);
 }
 

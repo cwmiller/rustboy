@@ -4,6 +4,8 @@ use cpu::instructions::*;
 use bus::{Addressable, Bus};
 use cartridge::Cartridge;
 
+// LD tests
+
 #[test]
 fn ld_a_b() {
     let mut cpu = Cpu::new();
@@ -18,6 +20,8 @@ fn ld_a_b() {
 
     assert_eq!(cpu.regs.a(), 0x9A);
 }
+
+// LDHL tests
 
 #[test]
 fn ldhl_carry() {
@@ -51,6 +55,8 @@ fn ldhl_half_carry() {
     assert_eq!(cpu.regs.f(), 0b0010 << 4);
 }
 
+// LDD tests
+
 #[test]
 fn ldd_a_hl() {
     let mut cpu = Cpu::new();
@@ -67,6 +73,8 @@ fn ldd_a_hl() {
     assert_eq!(cpu.regs.a(), 0x5E);
     assert_eq!(cpu.regs.hl(), 0xC000);
 }
+
+// LDI tests
 
 #[test]
 fn ldi_a_hl() {
@@ -85,6 +93,8 @@ fn ldi_a_hl() {
     assert_eq!(cpu.regs.hl(), 0xC001);
 }
 
+// PUSH tests
+
 #[test]
 fn push_to_stack() {
     let mut cpu = Cpu::new();
@@ -100,6 +110,8 @@ fn push_to_stack() {
     assert_eq!(bus.read(0xFFEE), 0xCC);
     assert_eq!(cpu.regs.sp(), 0xFFEE);
 }
+
+// POP tests
 
 #[test]
 fn pop_from_stack() {

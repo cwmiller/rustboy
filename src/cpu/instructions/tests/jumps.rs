@@ -4,6 +4,8 @@ use cpu::instructions::*;
 use bus::Bus;
 use cartridge::Cartridge;
 
+// JR tests
+
 #[test]
 fn jr_addr() {
     let mut cpu = Cpu::new();
@@ -30,6 +32,8 @@ fn jr_wrapping() {
     assert_eq!(cpu.regs.pc(), 9);
 }
 
+// JP tests
+
 #[test]
 fn jp_addr() {
     let mut cpu = Cpu::new();
@@ -42,6 +46,8 @@ fn jp_addr() {
 
     assert_eq!(cpu.regs.pc(), 0xFFFF);
 }
+
+// CALL tests
 
 #[test]
 fn call_addr() {
@@ -57,6 +63,8 @@ fn call_addr() {
     assert_eq!(cpu.pop_stack(&bus), 0xFF);
 }
 
+// RET tests
+
 #[test]
 fn ret_after_call() {
     let mut cpu = Cpu::new();
@@ -70,6 +78,8 @@ fn ret_after_call() {
 
     assert_eq!(cpu.regs.pc(), 0xFF);
 }
+
+// RETI tests
 
 #[test]
 fn reti_after_call() {
@@ -85,6 +95,8 @@ fn reti_after_call() {
     assert_eq!(cpu.regs.pc(), 0xFF);
     assert_eq!(cpu.ime, true);
 }
+
+// RST tests
 
 #[test]
 fn rst_10h() {
