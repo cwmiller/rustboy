@@ -1,5 +1,5 @@
 use bus::Bus;
-use super::super::{AddressingMode, Cpu, FLAG_Z, FLAG_C, FLAG_H, FLAG_N};
+use super::super::{AddressingMode, Cpu};
 
 // ADD (8bit)
 // Flags affected: Z, N, H, C
@@ -8,13 +8,12 @@ pub fn add_8(cpu: &mut Cpu, bus: &mut Bus, src: &AddressingMode<u8>) {
     let val = cpu.regs.a();
     let inc = src.read(cpu, bus);
     let sum = val.wrapping_add(inc);
-    let flags = 
-        if sum == 0 { FLAG_Z } else { 0 }           // Z
-        | (((val & 0xF) + (inc & 0xF)) & 0x10) << 1  // H
-        | if sum < val { FLAG_C } else { 0 };       // C
 
     cpu.regs.set_a(sum);
-    cpu.regs.set_f(flags);
+    cpu.regs.set_carry(sum < val);
+    cpu.regs.set_halfcarry(((val & 0xF) + (inc & 0xF)) & 0x10 == 0x10);
+    cpu.regs.set_subtract(false);
+    cpu.regs.set_zero(sum == 0);
 }
 
 // ADD (16bit)
@@ -26,16 +25,9 @@ pub fn add_16(cpu: &mut Cpu, bus: &mut Bus, dest: &AddressingMode<u16>, src: &Ad
 
     dest.write(cpu, bus, dest_val.wrapping_add(src_val));
 
-    let flags = 
-        (cpu.regs.f() & FLAG_Z)                                                 // Z
-        | if (((dest_val & 0xFFF) + (src_val & 0xFFF)) & 0x1000) == 0x1000      // H
-            { FLAG_H }
-            else { 0 }
-        | if dest_val.wrapping_add(src_val) < src_val                           // C
-            { FLAG_C }
-            else { 0 };
-
-    cpu.regs.set_f(flags);
+    cpu.regs.set_carry(dest_val.wrapping_add(src_val) < src_val);
+    cpu.regs.set_halfcarry((((dest_val & 0xFFF) + (src_val & 0xFFF)) & 0x1000) == 0x1000);
+    cpu.regs.set_subtract(false);
 }
 
 // ADD SP, r8
@@ -52,15 +44,10 @@ pub fn add_sp(cpu: &mut Cpu, bus: &mut Bus, src: &AddressingMode<u8>) {
         cpu.regs.set_sp(sp.wrapping_add(signed.abs() as u16));
     }
 
-    let flags =
-        if ((sp & 0xF) + (unsigned & 0xF)) & 0x10 == 0x10           // H
-            { FLAG_H }
-            else { 0 }
-        | if ((sp & 0xFF) + (unsigned & 0xFF)) & 0x100 == 0x100     // C
-            { FLAG_C } 
-            else { 0 };
-
-    cpu.regs.set_f(flags);
+    cpu.regs.set_carry(((sp & 0xFF) + (unsigned & 0xFF)) & 0x100 == 0x100);
+    cpu.regs.set_halfcarry(((sp & 0xF) + (unsigned & 0xF)) & 0x10 == 0x10);
+    cpu.regs.set_subtract(false);
+    cpu.regs.set_zero(false);
 }
 
 // ADC
@@ -69,21 +56,14 @@ pub fn add_sp(cpu: &mut Cpu, bus: &mut Bus, src: &AddressingMode<u8>) {
 pub fn adc(cpu: &mut Cpu, bus: &mut Bus, src: &AddressingMode<u8>) {
     let val = cpu.regs.a() as u32;
     let inc = src.read(cpu, bus) as u32;
-    let carry = cpu.regs.has_flag(FLAG_C) as u32;
-
+    let carry = cpu.regs.carry() as u32;
     let sum = val.wrapping_add(inc).wrapping_add(carry);
 
-    let flags =
-        if sum & 0xFF == 0 { FLAG_Z } else { 0 }           // Z
-        | if ((val & 0xF) + (inc & 0xF) + carry) & 0x10 == 0x10     // H
-            { FLAG_H }
-            else { 0 }
-        | if sum & 0x100 == 0x100 // C
-            { FLAG_C }
-            else { 0 };
-
     cpu.regs.set_a((sum & 0xFF) as u8);
-    cpu.regs.set_f(flags);
+    cpu.regs.set_carry(sum & 0x100 == 0x100);
+    cpu.regs.set_halfcarry(((val & 0xF) + (inc & 0xF) + carry) & 0x10 == 0x10);
+    cpu.regs.set_subtract(false);
+    cpu.regs.set_zero((sum & 0xFF) == 0);
 }
 
 // SUB
@@ -93,14 +73,12 @@ pub fn sub(cpu: &mut Cpu, bus: &mut Bus, src: &AddressingMode<u8>) {
     let val = cpu.regs.a();
     let dec = src.read(cpu, bus);
     let diff = val.wrapping_sub(dec);
-    let flags = 
-        if diff == 0 { FLAG_Z } else { 0 }                      // Z
-        | FLAG_N                                                 // N
-        | if (val & 0xF) < (dec & 0xF) { FLAG_H } else { 0 }    // H
-        | if val < dec { FLAG_C } else { 0 };                   // C
 
     cpu.regs.set_a(diff);
-    cpu.regs.set_f(flags);
+    cpu.regs.set_carry(val < dec);
+    cpu.regs.set_halfcarry((val & 0xF) < (dec & 0xF));
+    cpu.regs.set_subtract(true);
+    cpu.regs.set_zero(diff == 0);
 }
 
 // SBC
@@ -109,22 +87,15 @@ pub fn sub(cpu: &mut Cpu, bus: &mut Bus, src: &AddressingMode<u8>) {
 pub fn sbc(cpu: &mut Cpu, bus: &mut Bus, src: &AddressingMode<u8>) {
     let val = cpu.regs.a() as u32;
     let dec = src.read(cpu, bus) as u32;
-    let carry = cpu.regs.has_flag(FLAG_C) as u32;
+    let carry = cpu.regs.carry() as u32;
 
     let diff = val.wrapping_sub(dec).wrapping_sub(carry);
 
-    let flags =
-        FLAG_N
-        | if diff & 0xFF == 0 { FLAG_Z } else { 0 }           // Z
-        | if (val & 0xF) < (dec & 0xF) + carry      // H
-            { FLAG_H }
-            else { 0 }
-        | if diff & 0x100 == 0x100 // C
-            { FLAG_C }
-            else { 0 };
-
     cpu.regs.set_a(diff as u8);
-    cpu.regs.set_f(flags);
+    cpu.regs.set_carry(diff & 0x100 == 0x100);
+    cpu.regs.set_halfcarry((val & 0xF) < (dec & 0xF) + carry);
+    cpu.regs.set_subtract(true);
+    cpu.regs.set_zero(diff & 0xFF == 0);
 }
 
 // AND
@@ -134,12 +105,12 @@ pub fn and(cpu: &mut Cpu, bus: &mut Bus, src: &AddressingMode<u8>) {
     let existing = cpu.regs.a();
     let val = src.read(cpu, bus);
     let res = existing & val;
-    let flags =
-        if res == 0 { FLAG_Z } else { 0 }   // Z
-        | FLAG_H;                            // H
 
     cpu.regs.set_a(res);
-    cpu.regs.set_f(flags);
+    cpu.regs.set_carry(false);
+    cpu.regs.set_halfcarry(true);
+    cpu.regs.set_subtract(false);
+    cpu.regs.set_zero(res == 0);
 }
 
 // XOR
@@ -151,7 +122,10 @@ pub fn xor(cpu: &mut Cpu, bus: &mut Bus, src: &AddressingMode<u8>) {
     let res = existing ^ val;
 
     cpu.regs.set_a(res);
-    cpu.regs.set_f(if res == 0 { FLAG_Z } else { 0 });  // Z
+    cpu.regs.set_carry(false);
+    cpu.regs.set_halfcarry(false);
+    cpu.regs.set_subtract(false);
+    cpu.regs.set_zero(res == 0);
 }
 
 // OR
@@ -163,7 +137,10 @@ pub fn or(cpu: &mut Cpu, bus: &mut Bus, src: &AddressingMode<u8>) {
     let res = existing | val;
 
     cpu.regs.set_a(res);
-    cpu.regs.set_f(if res == 0 { FLAG_Z } else { 0 });   // Z
+    cpu.regs.set_carry(false);
+    cpu.regs.set_halfcarry(false);
+    cpu.regs.set_subtract(false);
+    cpu.regs.set_zero(res == 0);
 }
 
 // CP
@@ -174,13 +151,10 @@ pub fn cp(cpu: &mut Cpu, bus: &mut Bus, src: &AddressingMode<u8>) {
     let dec = src.read(cpu, bus);
     let diff = val.wrapping_sub(dec);
 
-    let flags =
-        if diff == 0 { FLAG_Z } else { 0 }                      // Z
-        | FLAG_N                                                 // N
-        | if (val & 0xF) < (dec & 0xF) { FLAG_H } else { 0 }    // H
-        | if val < dec { FLAG_C } else { 0 };                   // C
-
-    cpu.regs.set_f(flags);
+    cpu.regs.set_carry(val < dec);
+    cpu.regs.set_halfcarry((val & 0xF) < (dec & 0xF));
+    cpu.regs.set_subtract(true);
+    cpu.regs.set_zero(diff == 0);
 }
 
 // INC (8bit)
@@ -191,13 +165,9 @@ pub fn inc_8(cpu: &mut Cpu, bus: &mut Bus, dest: &AddressingMode<u8>) {
     let increased = val.wrapping_add(1);
 
     dest.write(cpu, bus, increased);
-
-    let flags = 
-        (if increased == 0 { FLAG_Z } else { 0 })   // Z
-        | (((val & 0xF) + 1) & 0x10) << 1            // H
-        | cpu.regs.f() & FLAG_C;                     // C
-
-    cpu.regs.set_f(flags);
+    cpu.regs.set_halfcarry((((val & 0xF) + 1) & 0x10) == 0x10);
+    cpu.regs.set_subtract(false);
+    cpu.regs.set_zero(increased == 0);
 }
 
 // DEC (8bit)
@@ -208,14 +178,9 @@ pub fn dec_8(cpu: &mut Cpu, bus: &mut Bus, dest: &AddressingMode<u8>) {
     let decreased = val.wrapping_sub(1);
 
     dest.write(cpu, bus, decreased);
-
-    let flags =
-        (if decreased == 0 { FLAG_Z } else { 0 })   // Z
-        | FLAG_N                                     // N
-        | if val & 0xF == 0 { FLAG_H } else { 0 }   // H
-        | cpu.regs.f() & FLAG_C;                     // C
-
-    cpu.regs.set_f(flags);
+    cpu.regs.set_halfcarry(val & 0xF == 0);
+    cpu.regs.set_subtract(true);
+    cpu.regs.set_zero(decreased == 0);
 }
 
 // INC (16bit)
@@ -239,31 +204,28 @@ pub fn dec_16(cpu: &mut Cpu, bus: &mut Bus, dest: &AddressingMode<u16>) {
 pub fn daa(cpu: &mut Cpu) {
     let mut a = cpu.regs.a() as u16;
 
-    if !cpu.regs.has_flag(FLAG_N) {
-        if cpu.regs.has_flag(FLAG_H) || (a & 0x0F) > 9 {
+    if !cpu.regs.subtract() {
+        if cpu.regs.halfcarry() || (a & 0x0F) > 9 {
             a = a.wrapping_add(0x06);
         }
 
-        if cpu.regs.has_flag(FLAG_C) || a > 0x9F {
+        if cpu.regs.carry() || a > 0x9F {
             a = a.wrapping_add(0x60);
         }
     } else {
-        if cpu.regs.has_flag(FLAG_H) {
+        if cpu.regs.halfcarry() {
             a = a.wrapping_sub(6) & 0xFF;
         }
 
-        if cpu.regs.has_flag(FLAG_C) {
+        if cpu.regs.carry() {
             a = a.wrapping_sub(0x60);
         }
     }
 
-    let flags =
-        if (a & 0xFF) == 0 { FLAG_Z } else { 0 }            // Z
-        | cpu.regs.f() & FLAG_N                              // N
-        | if (a & 0x100) == 0x100 { FLAG_C } else { 0 };    // C
-
-    cpu.regs.set_a(a as u8);
-    cpu.regs.set_f(flags);
+    cpu.regs.set_a((a & 0xFF) as u8);
+    cpu.regs.set_carry((a & 0x100) == 0x100);
+    cpu.regs.set_halfcarry(false);
+    cpu.regs.set_zero((a & 0xFF) == 0);
 
 }
 
@@ -271,16 +233,20 @@ pub fn daa(cpu: &mut Cpu) {
 // Flags affected: N, H, C
 #[inline(always)]
 pub fn scf(cpu: &mut Cpu) {
-    let flags = (cpu.regs.f() & FLAG_Z) | FLAG_C;
-    cpu.regs.set_f(flags);
+    cpu.regs.set_carry(true);
+    cpu.regs.set_halfcarry(false);
+    cpu.regs.set_subtract(false);
 }
 
 // CCF
 // Flags affected: N, H, C
 #[inline(always)]
 pub fn ccf(cpu: &mut Cpu) {
-    let flags = (cpu.regs.f() & FLAG_Z) | ((cpu.regs.f() ^ FLAG_C) & FLAG_C);
-    cpu.regs.set_f(flags);
+    let carry = cpu.regs.carry();
+
+    cpu.regs.set_carry(!carry);
+    cpu.regs.set_halfcarry(false);
+    cpu.regs.set_subtract(false);
 }
 
 // CPL
@@ -288,8 +254,8 @@ pub fn ccf(cpu: &mut Cpu) {
 #[inline(always)]
 pub fn cpl(cpu: &mut Cpu) {
     let a = !cpu.regs.a();
-    let flags = cpu.regs.f() | FLAG_N | FLAG_H;
 
     cpu.regs.set_a(a);
-    cpu.regs.set_f(flags);
+    cpu.regs.set_halfcarry(true);
+    cpu.regs.set_subtract(true);
 }

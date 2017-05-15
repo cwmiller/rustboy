@@ -1,5 +1,5 @@
 use bus::Bus;
-use super::super::{AddressingMode, Cpu, FLAG_C, FLAG_H};
+use super::super::{AddressingMode, Cpu};
 
 // LD
 #[inline(always)]
@@ -22,15 +22,10 @@ pub fn ldhl(cpu: &mut Cpu, bus: &mut Bus, src: &AddressingMode<u8>) {
         cpu.regs.set_hl(sp.wrapping_add(signed.abs() as u16));
     }
 
-    let flags =
-        if ((sp & 0xF) + (unsigned & 0xF)) & 0x10 == 0x10           // H
-            { FLAG_H }
-            else { 0 }
-        | if ((sp & 0xFF) + (unsigned & 0xFF)) & 0x100 == 0x100     // C
-            { FLAG_C }
-            else { 0 };
-
-    cpu.regs.set_f(flags);
+    cpu.regs.set_carry(((sp & 0xFF) + (unsigned & 0xFF)) & 0x100 == 0x100);
+    cpu.regs.set_halfcarry(((sp & 0xF) + (unsigned & 0xF)) & 0x10 == 0x10);
+    cpu.regs.set_subtract(false);
+    cpu.regs.set_zero(false);
 }
 
 // LDD

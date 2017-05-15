@@ -173,6 +173,48 @@ impl Registers {
     pub fn has_flag(&self, flag: u8) -> bool {
         (self.f() & flag) == flag
     }
+
+    pub fn set_flag(&mut self, flag: u8, set: bool) {
+        let flags = if set {
+            self.f() | flag
+        } else {
+            self.f() & !flag
+        };
+
+        self.set_f(flags);
+    }
+
+    pub fn carry(&self) -> bool {
+        self.has_flag(FLAG_C)
+    }
+
+    pub fn set_carry(&mut self, set: bool) {
+        self.set_flag(FLAG_C, set);
+    }
+
+    pub fn halfcarry(&self) -> bool {
+        self.has_flag(FLAG_H)
+    }
+
+    pub fn set_halfcarry(&mut self, set: bool) {
+        self.set_flag(FLAG_H, set);
+    }
+
+    pub fn subtract(&self) -> bool {
+        self.has_flag(FLAG_N)
+    }
+
+    pub fn set_subtract(&mut self, set: bool) {
+        self.set_flag(FLAG_N, set);
+    }
+
+    pub fn zero(&self) -> bool {
+        self.has_flag(FLAG_N)
+    }
+
+    pub fn set_zero(&mut self, set: bool) {
+        self.set_flag(FLAG_Z, set);
+    }
 }
 
 impl fmt::Debug for Registers {
@@ -180,10 +222,10 @@ impl fmt::Debug for Registers {
         try!(writeln!(f, "A : {:#04X}\tF : {:#04X} ({}{}{}{})", 
             self.a(), 
             self.f(),
-            if self.has_flag(FLAG_Z) { "Z" } else { "" },
-            if self.has_flag(FLAG_N) { "N" } else { "" },
-            if self.has_flag(FLAG_H) { "H" } else { "" },
-            if self.has_flag(FLAG_C) { "C" } else { "" }
+            if self.zero() { "Z" } else { "" },
+            if self.subtract() { "N" } else { "" },
+            if self.halfcarry() { "H" } else { "" },
+            if self.carry() { "C" } else { "" }
         ));
 
         try!(writeln!(f, "B : {:#04X}\tC : {:#04X}", self.b(), self.c()));
