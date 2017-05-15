@@ -39,7 +39,7 @@ fn rlca_zero_result() {
     rlca(&mut cpu);
 
     assert_eq!(cpu.regs.a(), 0);
-    assert_eq!(cpu.regs.f(), 0b1000 << 4);
+    assert_eq!(cpu.regs.f(), 0b0000 << 4);
 }
 
 // RLA tests
@@ -77,7 +77,7 @@ fn rla_zero_result() {
     rla(&mut cpu);
 
     assert_eq!(cpu.regs.a(), 0);
-    assert_eq!(cpu.regs.f(), 0b1001 << 4);
+    assert_eq!(cpu.regs.f(), 0b0001 << 4);
 }
 
 // RRCA tests
@@ -115,7 +115,7 @@ fn rrca_zero_result() {
     rrca(&mut cpu);
 
     assert_eq!(cpu.regs.a(), 0);
-    assert_eq!(cpu.regs.f(), 0b1000 << 4);
+    assert_eq!(cpu.regs.f(), 0b0000 << 4);
 }
 
 // RRA tests
@@ -153,7 +153,7 @@ fn rra_zero_result() {
     rra(&mut cpu);
 
     assert_eq!(cpu.regs.a(), 0);
-    assert_eq!(cpu.regs.f(), 0b1001 << 4);
+    assert_eq!(cpu.regs.f(), 0b0001 << 4);
 }
 
 // RLC tests

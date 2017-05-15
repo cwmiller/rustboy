@@ -43,7 +43,6 @@ pub fn add_16(cpu: &mut Cpu, bus: &mut Bus, dest: &AddressingMode<u16>, src: &Ad
 #[inline(always)]
 pub fn add_sp(cpu: &mut Cpu, bus: &mut Bus, src: &AddressingMode<u8>) {
     let sp = cpu.regs.sp();
-    let low = (sp >> 8) as u8;
     let signed = src.read(cpu, bus) as i8;
     let unsigned = src.read(cpu, bus) as u16;
 

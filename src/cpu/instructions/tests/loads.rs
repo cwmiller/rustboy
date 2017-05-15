@@ -46,12 +46,12 @@ fn ldhl_half_carry() {
     let reg = RegisterAddressing(Register::A);
 
     cpu.regs.set_f(0b1111);
-    cpu.regs.set_sp(0xFF);
+    cpu.regs.set_sp(0x0F);
     cpu.regs.set_a(1);
 
     ldhl(&mut cpu, &mut bus, &reg);
 
-    assert_eq!(cpu.regs.hl(), 0x0100);
+    assert_eq!(cpu.regs.hl(), 0x0010);
     assert_eq!(cpu.regs.f(), 0b0010 << 4);
 }
 

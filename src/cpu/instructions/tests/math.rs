@@ -123,29 +123,29 @@ fn add16_half_carry_flag() {
 fn add_sp_carry_flag() {
     let mut cpu = Cpu::new();
     let mut bus = Bus::new(Cartridge::from_vec(vec![0; 65536]));
-    let inc = ImmediateAddressing(100);
+    let inc = ImmediateAddressing(0x10);
 
     cpu.regs.set_f(0b1111 << 4);
-    cpu.regs.set_sp(0xFFF0);
+    cpu.regs.set_sp(0x00F0);
 
     add_sp(&mut cpu, &mut bus, &inc);
 
-    assert_eq!(cpu.regs.sp(), 0x0054);
-    assert_eq!(cpu.regs.f(), 0b011 << 4);
+    assert_eq!(cpu.regs.sp(), 0x100);
+    assert_eq!(cpu.regs.f(), 0b0001 << 4);
 }
 
 #[test]
 fn add_sp_half_carry_flag() {
     let mut cpu = Cpu::new();
     let mut bus = Bus::new(Cartridge::from_vec(vec![0; 65536]));
-    let inc = ImmediateAddressing(100);
+    let inc = ImmediateAddressing(0xF);
 
     cpu.regs.set_f(0b1111 << 4);
-    cpu.regs.set_sp(0xFF0);
+    cpu.regs.set_sp(0xF01);
 
     add_sp(&mut cpu, &mut bus, &inc);
 
-    assert_eq!(cpu.regs.sp(), 0x1054);
+    assert_eq!(cpu.regs.sp(), 0xF10);
     assert_eq!(cpu.regs.f(), 0b010 << 4);
 }
 
@@ -223,7 +223,7 @@ fn adc_zero() {
     adc(&mut cpu, &mut bus, &n);
 
     assert_eq!(cpu.regs.a(), 0);
-    assert_eq!(cpu.regs.f(), 0b1001 << 4);
+    assert_eq!(cpu.regs.f(), 0b1011 << 4);
 }
 
 // SUB tests
@@ -317,7 +317,7 @@ fn sbc_with_carry_does_carry() {
     sbc(&mut cpu, &mut bus, &n);
 
     assert_eq!(cpu.regs.a(), 0xEF);
-    assert_eq!(cpu.regs.f(), 0b0101 << 4);
+    assert_eq!(cpu.regs.f(), 0b0111 << 4);
 }
 
 #[test]

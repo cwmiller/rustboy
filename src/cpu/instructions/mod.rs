@@ -196,10 +196,6 @@ fn ind16_addr(word: u16) -> Box<IndirectAddressing<u16>> {
     Box::new(IndirectAddressing(word))
 }
 
-fn ext_addr(word: u16) -> Box<ExtendedAddressing> {
-    Box::new(ExtendedAddressing(word))
-}
-
 fn reg_addr_table(idx: u8) -> Box<AddressingMode<u8>> {
     match idx {
         0 => Box::new(RegisterAddressing(Register::B)),
