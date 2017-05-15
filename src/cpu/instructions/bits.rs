@@ -6,14 +6,12 @@ use cpu::{AddressingMode, Cpu, FLAG_Z, FLAG_C, FLAG_H, FLAG_N};
 #[inline(always)]
 pub fn rlca(cpu: &mut Cpu) {
     let val = cpu.regs.a();
-    let adj = val << 1;
     let carry = (val >> 7) & 1;
+    let shifted = val << 1 | carry;
+    let flags = carry << 4;
 
-    cpu.regs.set_a(adj | carry);
-
-    cpu.regs.set_f(
-        (if adj == 0 { FLAG_Z } else { 0 })     // Z
-        | carry << 4);                           // C
+    cpu.regs.set_a(shifted);
+    cpu.regs.set_f(flags);
 }
 
 // RLA
@@ -21,13 +19,12 @@ pub fn rlca(cpu: &mut Cpu) {
 #[inline(always)]
 pub fn rla(cpu: &mut Cpu) {
     let val = cpu.regs.a();
-    let adj = (val << 1) | ((cpu.regs.f() & FLAG_C) >> 4);
+    let carry = (val >> 7) & 1;
+    let shifted = (val << 1) | ((cpu.regs.f() & FLAG_C) >> 4);
+    let flags = carry << 4;
 
-    cpu.regs.set_a(adj);
-
-    cpu.regs.set_f(
-        (if adj == 0 { FLAG_Z } else { 0 }) // Z
-        | (val & 0b10000000) >> 3);          // C
+    cpu.regs.set_a(shifted);
+    cpu.regs.set_f(flags);
 }
 
 // RRCA
@@ -36,13 +33,10 @@ pub fn rla(cpu: &mut Cpu) {
 pub fn rrca(cpu: &mut Cpu) {
     let val = cpu.regs.a();
     let carry = val & 1;
-    let adj = carry << 7 | val >> 1;
+    let shifted = carry << 7 | val >> 1;
+    let flags = carry << 4;
 
-    let flags = 
-        (if adj == 0 { FLAG_Z } else { 0 }) // Z
-        | carry << 4;                        // C
-
-    cpu.regs.set_a(adj | (carry << 7));
+    cpu.regs.set_a(shifted);
     cpu.regs.set_f(flags);
 }
 
@@ -51,13 +45,10 @@ pub fn rrca(cpu: &mut Cpu) {
 #[inline(always)]
 pub fn rra(cpu: &mut Cpu) {
     let val = cpu.regs.a();
-    let adj = (val >> 1) | ((cpu.regs.f() & FLAG_C) << 3);
+    let shifted = (val >> 1) | ((cpu.regs.f() & FLAG_C) << 3);
+    let flags = (val & 1) << 4;
 
-    let flags = 
-        (if adj == 0 { FLAG_Z } else { 0 }) // Z
-        | (val & 1) << 4;                    // C
-
-    cpu.regs.set_a(adj);
+    cpu.regs.set_a(shifted);
     cpu.regs.set_f(flags);
 }
 
@@ -65,27 +56,26 @@ pub fn rra(cpu: &mut Cpu) {
 // Affects flags: Z, N, H, C
 pub fn rlc(cpu: &mut Cpu, bus: &mut Bus, reg: &AddressingMode<u8>) {
     let val = reg.read(cpu, bus);
-    let lb = val & 0b10000000;
-    let shifted = val << 1 | (lb >> 7);
+    let carry = (val >> 7) & 1;
+    let shifted = val << 1 | carry;
     let flags = 
         if shifted == 0 { FLAG_Z } else { 0 }   // Z
-        | (lb >> 3);                             // C
+        | if carry == 1 { FLAG_C } else { 0 };  // C
 
     reg.write(cpu, bus, shifted);
     cpu.regs.set_f(flags);
     cpu.prefixed = false;
-        
 }
 
 // RRC
 // Affects flags: Z, N, H, C
 pub fn rrc(cpu: &mut Cpu, bus: &mut Bus, reg: &AddressingMode<u8>) {
     let val = reg.read(cpu, bus);
-    let rb = val & 1;
-    let shifted = rb << 7 | val >> 1;
+    let carry = val & 1;
+    let shifted = carry << 7 | val >> 1;
     let flags = 
         if shifted == 0 { FLAG_Z } else { 0 }   // Z
-        | rb << 4;                               // C
+        | carry << 4;                               // C
 
     reg.write(cpu, bus, shifted);
     cpu.regs.set_f(flags);
@@ -96,11 +86,11 @@ pub fn rrc(cpu: &mut Cpu, bus: &mut Bus, reg: &AddressingMode<u8>) {
 // Affects flags: Z, N, H, C
 pub fn rl(cpu: &mut Cpu, bus: &mut Bus, reg: &AddressingMode<u8>) {
     let val = reg.read(cpu, bus);
-    let lb = val & 0b10000000;
+    let carry = val & 0b10000000;
     let shifted = val << 1 | ((cpu.regs.f() & FLAG_C) >> 4);
     let flags =
         if shifted == 0 { FLAG_Z } else { 0 }
-        | lb >> 3;
+        | carry >> 3;
 
     reg.write(cpu, bus, shifted);
     cpu.regs.set_f(flags);
@@ -111,11 +101,11 @@ pub fn rl(cpu: &mut Cpu, bus: &mut Bus, reg: &AddressingMode<u8>) {
 // Affects flags: Z, N, H, C
 pub fn rr(cpu: &mut Cpu, bus: &mut Bus, reg: &AddressingMode<u8>) {
     let val = reg.read(cpu, bus);
-    let rb = val & 1;
+    let carry = val & 1;
     let shifted = val >> 1 | ((cpu.regs.f() & FLAG_C) << 3);
     let flags =
         if shifted == 0 { FLAG_Z } else { 0 }   // Z
-        | rb << 4;                               // C
+        | carry << 4;                            // C
 
     reg.write(cpu, bus, shifted);
     cpu.regs.set_f(flags);
@@ -126,11 +116,11 @@ pub fn rr(cpu: &mut Cpu, bus: &mut Bus, reg: &AddressingMode<u8>) {
 // Affects flags: Z, N, H, C
 pub fn sla(cpu: &mut Cpu, bus: &mut Bus, reg: &AddressingMode<u8>) {
     let val = reg.read(cpu, bus);
-    let lb = val & 0b10000000;
+    let carry = val & 0b10000000;
     let shifted = val << 1 & !1;
     let flags =
         if shifted == 0 { FLAG_Z } else { 0 }   // Z
-        | lb >> 3;                               // C
+        | carry >> 3;                            // C
 
     reg.write(cpu, bus, shifted);
     cpu.regs.set_f(flags);
@@ -141,11 +131,11 @@ pub fn sla(cpu: &mut Cpu, bus: &mut Bus, reg: &AddressingMode<u8>) {
 // Affects flags: Z, N, H, C
 pub fn sra(cpu: &mut Cpu, bus: &mut Bus, reg: &AddressingMode<u8>) {
     let val = reg.read(cpu, bus);
-    let rb = val & 1;
+    let carry = val & 1;
     let shifted = val & 0b10000000 | val >> 1;
     let flags =
         if shifted == 0 { FLAG_Z } else { 0 }   // Z
-        | rb << 4;                               // C
+        | carry << 4;                            // C
 
     reg.write(cpu, bus, shifted);
     cpu.regs.set_f(flags);

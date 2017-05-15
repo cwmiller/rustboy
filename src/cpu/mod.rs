@@ -129,9 +129,7 @@ impl Cpu {
         self.regs.set_pc(pc + length);
 
         if let Some(instruction) = decoded_instruction {
-            //println!("{:#06X}: {}", pc, instruction);
             inst::execute(self, bus, instruction);
-            //println!("{:?}", self);
         }
 
         cycles

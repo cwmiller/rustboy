@@ -250,7 +250,7 @@ pub fn decode(opcode: u8, prefixed: bool, mut next: &mut FnMut() -> u8) -> Optio
             match (x, y, z, q, p) {
                 // X=0, Z=0
                 (0, 0, 0, _, _) => Some(Nop),
-                (0, 1, 0, _, _) => Some(Ld8(ext_addr(next16(&mut next)), reg_addr(SP))),
+                (0, 1, 0, _, _) => Some(Ld16(ind16_addr(next16(&mut next)), reg_addr(SP))),
                 (0, 2, 0, _, _) => { next16(&mut next); Some(Stop) },
                 (0, 3, 0, _, _) => Some(Jr(Condition::None, imm8_addr(next()))),
                 (0, 4...7, 0, _, _) => Some(Jr(cond_table(y-4), imm8_addr(next()))),

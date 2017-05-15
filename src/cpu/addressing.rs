@@ -68,6 +68,23 @@ impl AddressingMode<u8> for IndirectAddressing<u16> {
     }
 }
 
+impl AddressingMode<u16> for IndirectAddressing<u16> {
+    fn read(&self, _: &Cpu, bus: &Bus) -> u16 {
+        let low = bus.read(self.0) as u16;
+        let high = bus.read(self.0 + 1) as u16;
+
+        (high << 8) | low
+    }
+
+    fn write(&self, _: &mut Cpu, bus: &mut Bus, val: u16) {
+        let low = (val & 0xFF) as u8;
+        let high = ((val & 0xFF00) >> 8) as u8;
+
+        bus.write(self.0, low);
+        bus.write(self.0 + 1, high);
+    }
+}
+
 impl<T> fmt::Display for IndirectAddressing<T> where T : fmt::UpperHex {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         write!(f, "({:#X})", self.0)

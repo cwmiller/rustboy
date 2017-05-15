@@ -1,5 +1,5 @@
 use bus::Bus;
-use super::super::{AddressingMode, Cpu, FLAG_C};
+use super::super::{AddressingMode, Cpu, FLAG_C, FLAG_H};
 
 // LD
 #[inline(always)]
@@ -13,19 +13,21 @@ pub fn ld<T>(cpu: &mut Cpu, bus: &mut Bus, dest: &AddressingMode<T>, src: &Addre
 #[inline(always)]
 pub fn ldhl(cpu: &mut Cpu, bus: &mut Bus, src: &AddressingMode<u8>) {
     let sp = cpu.regs.sp();
-    let immediate = src.read(cpu, bus) as u16;
-    let offset = immediate as i16;
+    let unsigned = src.read(cpu, bus) as u16;
+    let signed = src.read(cpu, bus) as i8;
 
-    if offset > 0 {
-        cpu.regs.set_hl(sp.wrapping_add(immediate));
+    if signed < 0 {
+        cpu.regs.set_hl(sp.wrapping_sub(signed.abs() as u16));
     } else {
-        cpu.regs.set_hl(sp.wrapping_sub(offset.abs() as u16));
+        cpu.regs.set_hl(sp.wrapping_add(signed.abs() as u16));
     }
 
     let flags =
-        ((((sp & 0xF) + (immediate  & 0xF)) & 0x10) as u8) << 1 // H
-        | if sp.wrapping_add(immediate) < sp                    // C
-            { FLAG_C } 
+        if ((sp & 0xF) + (unsigned & 0xF)) & 0x10 == 0x10           // H
+            { FLAG_H }
+            else { 0 }
+        | if ((sp & 0xFF) + (unsigned & 0xFF)) & 0x100 == 0x100     // C
+            { FLAG_C }
             else { 0 };
 
     cpu.regs.set_f(flags);

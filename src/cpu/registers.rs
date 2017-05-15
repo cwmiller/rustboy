@@ -60,7 +60,8 @@ impl Registers {
     }
 
     pub fn set_a(&mut self, val: u8) {
-        self.af = (self.af & 0x00FF) | ((val as u16) << 8);
+        let af = (self.af & 0x00FF) | ((val as u16) << 8);
+        self.set_af(af);
     }
 
     pub fn b(&self) -> u8 {
@@ -100,7 +101,8 @@ impl Registers {
     }
 
     pub fn set_f(&mut self, val: u8) {
-        self.af = (self.af & 0xFF00) | (val as u16) & 0xFF;
+        let af = (self.af & 0xFF00) | (val as u16) & 0xFF;
+        self.set_af(af);
     }
 
     pub fn h(&self) -> u8 {
@@ -124,7 +126,8 @@ impl Registers {
     }
 
     pub fn set_af(&mut self, val: u16) {
-        self.af = val;
+        // Do not allow values to be written to the lower nibble of the F register.
+        self.af = val & 0xFFF0;
     }
 
     pub fn bc(&self) -> u16 {
