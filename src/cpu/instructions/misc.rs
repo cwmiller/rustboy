@@ -7,16 +7,15 @@ pub fn nop() {
 }
 
 // STOP 0
-// TODO: halt cpu/lcd
 #[inline(always)]
-pub fn stop() {
-    // TODO
+pub fn stop(cpu: &mut Cpu) {
+    cpu.halted = true;
 }
 
 // HALT
 #[inline(always)]
-pub fn halt() {
-    // TODO
+pub fn halt(cpu: &mut Cpu) {
+    cpu.halted = true;
 }
 
 // PREFIX CB

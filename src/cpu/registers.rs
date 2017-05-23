@@ -219,18 +219,18 @@ impl Registers {
 
 impl fmt::Debug for Registers {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        try!(writeln!(f, "A : {:#04X}\tF : {:#04X} ({}{}{}{})", 
+        writeln!(f, "A : {:#04X}\tF : {:#04X} ({}{}{}{})",
             self.a(), 
             self.f(),
             if self.zero() { "Z" } else { "" },
             if self.subtract() { "N" } else { "" },
             if self.halfcarry() { "H" } else { "" },
             if self.carry() { "C" } else { "" }
-        ));
+        )?;
 
-        try!(writeln!(f, "B : {:#04X}\tC : {:#04X}", self.b(), self.c()));
-        try!(writeln!(f, "D : {:#04X}\tE : {:#04X}", self.d(), self.e()));
-        try!(writeln!(f, "H : {:#04X}\tL : {:#04X}", self.h(), self.l()));
+        writeln!(f, "B : {:#04X}\tC : {:#04X}", self.b(), self.c())?;
+        writeln!(f, "D : {:#04X}\tE : {:#04X}", self.d(), self.e())?;
+        writeln!(f, "H : {:#04X}\tL : {:#04X}", self.h(), self.l())?;
         writeln!(f, "SP: {:#06X}\tPC: {:#06X}", self.sp(), self.pc())
     }
 }

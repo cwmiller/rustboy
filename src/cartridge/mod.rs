@@ -122,7 +122,7 @@ impl Addressable for Cartridge {
             let mapper = self.mapper.as_mut().unwrap();
             mapper.write(addr, val)
         } else {
-            panic!("Cannot write to ROM!");
+            // panic!("Cannot write to ROM!");
         }
     }
 }

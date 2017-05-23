@@ -205,7 +205,7 @@ pub fn daa(cpu: &mut Cpu) {
     let mut a = cpu.regs.a() as u16;
 
     if !cpu.regs.subtract() {
-        if cpu.regs.halfcarry() || (a & 0x0F) > 9 {
+        if cpu.regs.halfcarry() || (a & 0xF) > 9 {
             a = a.wrapping_add(0x06);
         }
 

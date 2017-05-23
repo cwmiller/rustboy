@@ -40,7 +40,6 @@ fn main() {
 }
 
 fn start_emu(cart: Cartridge) {
-    //let mut framebuffer: Vec<u32> = vec![0; BUFFER_WIDTH * BUFFER_HEIGHT];
     let mut framebuffer = [0; BUFFER_WIDTH * BUFFER_HEIGHT];
 
     let mut window = Window::new("Rustboy",
@@ -78,6 +77,7 @@ fn start_emu(cart: Cartridge) {
         }
 
         let cycles = cpu.step(&mut bus);
+
         let timer_result = bus.timer.step(cycles);
         let lcd_result = bus.lcd.step(cycles, &mut framebuffer);
 

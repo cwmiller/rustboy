@@ -77,6 +77,7 @@ impl Timer {
                 // When TIMA overflows, it is reset to TMA and an interrupt is raised.
                 if previous > self.tima {
                     self.tima = self.tma;
+                    self.tac_counter = 0;
                     result.interrupt = true;
                 }
             }

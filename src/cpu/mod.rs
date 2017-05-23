@@ -25,15 +25,16 @@ impl fmt::Display for Condition {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         match *self {
             Condition::None => write!(f, ""),
-            Condition::Z => write!(f, "Z"),
-            Condition::C => write!(f, "C"),
-            Condition::Nz => write!(f, "NZ"),
-            Condition::Nc => write!(f, "NC")
+            Condition::Z    => write!(f, "Z"),
+            Condition::C    => write!(f, "C"),
+            Condition::Nz   => write!(f, "NZ"),
+            Condition::Nc   => write!(f, "NC")
         }
     }
 }
 
 enum_from_primitive! {
+#[derive(Copy, Clone)]
 pub enum Interrupt {
     Keypad = 0b00010000,
     Serial = 0b00001000,
@@ -47,8 +48,8 @@ fn interrupt_start_address(interrupt: Interrupt) -> u16 {
     match interrupt {
         Interrupt::Keypad => 0x60,
         Interrupt::Serial => 0x58,
-        Interrupt::Timer => 0x50,
-        Interrupt::Stat => 0x48,
+        Interrupt::Timer  => 0x50,
+        Interrupt::Stat   => 0x48,
         Interrupt::VBlank => 0x40
     }
 }
@@ -79,6 +80,7 @@ static PREFIXED_CYCLES: &'static [usize] = &[
 pub struct Cpu {
     pub regs: Registers,
     ime: bool,
+    halted: bool,
     prefixed: bool
 }
 
@@ -86,6 +88,7 @@ impl Cpu {
     pub fn new() -> Self {
         Cpu {
             regs: Registers::default(),
+            halted: false,
             ime: true,
             prefixed: false
         }
@@ -103,42 +106,63 @@ impl Cpu {
     }
 
     pub fn step(&mut self, bus: &mut Bus) -> usize {
-        self.handle_pending_interrupt(bus);
+        let interrupt = self.pending_interrupt(bus);
 
-        let pc = self.regs.pc();
-        let opcode = bus.read(pc);
-        let mut length = 1;
-        
-        let cycles = 
-            if self.prefixed { 
-                PREFIXED_CYCLES[opcode as usize & 0x0F]
+        // If an interrupt is pending and interrupts are enabled, jump to interrupt
+        if interrupt.is_some() && self.ime {
+            self.handle_interrupt(bus, interrupt.unwrap());
+
+            // It takes 20 cycles to dispatch interrupt, 24 if HALTed.
+            if self.halted {
+                // Clear HALT.
+                self.halted = false;
+                24
             } else {
-                CYCLES[opcode as usize]
+                20
+            }
+        // An an interrupt is pending, interrupts are disabled, and the CPU is halted, then unhalt the CPU
+        } else if interrupt.is_some() & !self.ime && self.halted {
+            self.halted = true;
+            4
+        // Else execute the next instruction
+        } else {
+            let pc = self.regs.pc();
+            let opcode = bus.read(pc);
+            let mut length = 1;
+
+            let cycles =
+                if self.prefixed {
+                    PREFIXED_CYCLES[opcode as usize & 0x0F]
+                } else {
+                    CYCLES[opcode as usize]
+                };
+
+            let decoded_instruction = {
+                let mut next = || {
+                    let byte = bus.read(pc.wrapping_add(length));
+                    length = length + 1;
+                    byte
+                };
+
+                inst::decode(opcode, self.prefixed, &mut next)
             };
 
-        let decoded_instruction = {
-            let mut next = || {
-                let byte = bus.read(pc.wrapping_add(length));
-                length = length + 1; 
-                byte
-            };
+            self.regs.set_pc(pc + length);
 
-            inst::decode(opcode, self.prefixed, &mut next)
-        };
+            if let Some(instruction) = decoded_instruction {
+                //println!("{:#X}: {}", pc, instruction);
+                inst::execute(self, bus, instruction);
+            }
 
-        self.regs.set_pc(pc + length);
-
-        if let Some(instruction) = decoded_instruction {
-            inst::execute(self, bus, instruction);
+            cycles
         }
-
-        cycles
     }
 
-    pub fn interrupt(&self, bus: &mut Bus, interrupt: Interrupt) {
+    pub fn interrupt(&mut self, bus: &mut Bus, interrupt: Interrupt) {
         let flags = bus.read(IO_IF_ADDR);
         let interrupt_flag = interrupt as u8;
 
+        self.halted = false;
         bus.write(IO_IF_ADDR, flags | interrupt_flag);
     }
 
@@ -162,51 +186,60 @@ impl Cpu {
     fn condition_met(&self, cond: Condition) -> bool {
         match cond {
             Condition::None => true,
-            Condition::C => (self.regs.f() & FLAG_C) == FLAG_C,
-            Condition::Z => (self.regs.f() & FLAG_Z) == FLAG_Z,
-            Condition::Nc => (self.regs.f() & FLAG_C) != FLAG_C,
-            Condition::Nz => (self.regs.f() & FLAG_Z) != FLAG_Z
+            Condition::C    => (self.regs.f() & FLAG_C) == FLAG_C,
+            Condition::Z    => (self.regs.f() & FLAG_Z) == FLAG_Z,
+            Condition::Nc   => (self.regs.f() & FLAG_C) != FLAG_C,
+            Condition::Nz   => (self.regs.f() & FLAG_Z) != FLAG_Z
         }
     }
 
-    fn handle_pending_interrupt(&mut self, bus: &mut Bus) {
-        if self.ime {
-            let pending_interrupts = bus.read(IO_IF_ADDR) & bus.read(IO_IE_ADDR);
+    fn pending_interrupt(&self, bus: &Bus) -> Option<Interrupt> {
+        let mut result = None;
 
-            if pending_interrupts > 0 {
-                let mut flag = Interrupt::Keypad as u8;
-
-                while flag > 0 {
-                    if pending_interrupts & flag == flag {
-                        self.ime = false;
-                        bus.write(IO_IF_ADDR, pending_interrupts ^ flag);
-
-                        let interrupt = Interrupt::from_u8(flag).unwrap();
-                        let current_pc = self.regs.pc();
-                        let interrupt_addr = interrupt_start_address(interrupt);
-
-                        println!("Handling interrupt {:#X}, setting PC to {:#X}", flag, interrupt_addr);
-
-                        self.push_stack(bus, current_pc);
-                        self.regs.set_pc(interrupt_addr);
-                        break;
-                    }
-
-                    flag = flag >> 1;
+        let interrupts = bus.read(IO_IF_ADDR) & bus.read(IO_IE_ADDR);
+        if interrupts > 0 {
+            let mut flag = Interrupt::Keypad as u8;
+            while flag > 0 {
+                if interrupts & flag == flag {
+                    let interrupt = Interrupt::from_u8(flag).unwrap();
+                    result = Some(interrupt);
+                    break;
                 }
+
+                flag = flag >> 1;
             }
         }
+
+        result
+    }
+
+    fn handle_interrupt(&mut self, bus: &mut Bus, interrupt: Interrupt) {
+        let addr = interrupt_start_address(interrupt);
+
+        println!("Interrupted! Setting PC to {:#X}", addr);
+
+        // Push current PC to stack and set PC to interrupt address.
+        let pc = self.regs.pc();
+        self.push_stack(bus, pc);
+        self.regs.set_pc(addr);
+
+        // Disable interrupts
+        self.ime = false;
+
+        // Clear IF flag
+        let if_register = bus.read(IO_IF_ADDR);
+        bus.write(IO_IF_ADDR, if_register ^ (interrupt as u8));
     }
 }
 
 impl fmt::Debug for Cpu {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        try!(writeln!(f, "Ints: {}\tPrefixed: {}",  
+        writeln!(f, "Ints: {}\tPrefixed: {}",
             if self.ime { "Enabled" } else { "Disabled" },
             if self.prefixed { "Yes" } else { "No" },
-        ));
+        )?;
 
-        try!(writeln!(f, "Registers:"));
+        writeln!(f, "Registers:")?;
         write!(f, "{:?}", self.regs)
     }
 }
