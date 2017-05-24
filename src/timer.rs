@@ -1,8 +1,6 @@
 use bus::Addressable;
 use enum_primitive::FromPrimitive;
 
-const DIV_CYCLES: usize = 16384;
-
 const ADDR_DIV: u16  = 0xFF04;
 const ADDR_TIMA: u16 = 0xFF05;
 const ADDR_TMA: u16  = 0xFF06;
@@ -21,10 +19,10 @@ enum TacFrequency {
 impl TacFrequency {
     fn as_cycles(&self) -> usize {
         match *self {
-            TacFrequency::Khz4 => 4096,
-            TacFrequency::Khz262 => 262144,
-            TacFrequency::Khz65 => 65536,
-            TacFrequency::Khz16 => 16384
+            TacFrequency::Khz4 => 1024,
+            TacFrequency::Khz262 => 16,
+            TacFrequency::Khz65 => 64,
+            TacFrequency::Khz16 => 256
         }
     }
 }
@@ -35,8 +33,7 @@ pub struct TimerResult {
 }
 
 pub struct Timer {
-    div: u8,
-    div_counter: usize,
+    div: u16,
     tima: u8,
     tma: u8,
     tac_enabled: bool,
@@ -47,8 +44,7 @@ pub struct Timer {
 impl Timer {
     pub fn new() -> Self {
         Timer {
-            div: 0,
-            div_counter: 0,
+            div: 0xABCC,
             tima: 0,
             tma: 0,
             tac_enabled: false,
@@ -57,15 +53,12 @@ impl Timer {
         }
     }
 
+    // TODO: implement odd Timer behaviors
     pub fn step(&mut self, cycles: usize) -> TimerResult {
         let mut result = TimerResult::default();
 
         // DIV always counts at a constant interval even if the timer is disabled
-        self.div_counter = self.div_counter + cycles;
-        if self.div_counter >= DIV_CYCLES {
-            self.div = self.div.wrapping_add(1);
-            self.div_counter = 0;
-        }
+        self.div = self.div.wrapping_add(cycles as u16);
 
         // TIMA counts if TAC is enabled. It counts at an interval set by TAC.
         if self.tac_enabled {
@@ -90,7 +83,7 @@ impl Timer {
 impl Addressable for Timer {
     fn read(&self, addr: u16) -> u8 {
         match addr {
-            ADDR_DIV => self.div,
+            ADDR_DIV => (self.div >> 8) as u8, // Retrieving DIV only returns the MSB,
             ADDR_TIMA => self.tima,
             ADDR_TMA => self.tma,
             ADDR_TAC => (self.tac_enabled as u8) << 2 | self.tac_freq as u8,

@@ -12,6 +12,7 @@ mod bus;
 mod cartridge;
 mod debugger;
 mod cpu;
+mod joypad;
 mod lcd;
 mod serial;
 mod sound;

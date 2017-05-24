@@ -216,8 +216,6 @@ impl Cpu {
     fn handle_interrupt(&mut self, bus: &mut Bus, interrupt: Interrupt) {
         let addr = interrupt_start_address(interrupt);
 
-        println!("Interrupted! Setting PC to {:#X}", addr);
-
         // Push current PC to stack and set PC to interrupt address.
         let pc = self.regs.pc();
         self.push_stack(bus, pc);

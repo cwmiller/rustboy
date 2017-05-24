@@ -1,5 +1,6 @@
 use cartridge::Cartridge;
-use lcd::Lcd;
+use joypad::Joypad;
+use lcd::{Lcd, ADDR_DMA};
 use serial::Serial;
 use sound::Sound;
 use timer::Timer;
@@ -22,6 +23,11 @@ const ECHO_RAM_END: u16 = 0xFDFF;
 
 pub const OAM_START: u16 = 0xFE00;
 pub const OAM_END: u16 = 0xFE9F;
+
+const UNUSED_START: u16 = 0xFEA0;
+const UNUSED_END: u16 = 0xFEFF;
+
+const IO_JOYPAD: u16 = 0xFF00;
 
 const IO_SERIAL_START: u16 = 0xFF01;
 const IO_SERIAL_END: u16 = 0xFF02;
@@ -77,6 +83,7 @@ pub struct Bus {
     io_ie: u8,
     io_if: u8,
     high_ram: Ram,
+    pub joypad: Joypad,
     pub lcd: Lcd,
     serial: Serial,
     sound: Sound,
@@ -91,6 +98,7 @@ impl Bus {
             io_ie: 0,
             io_if: 0,
             high_ram: Ram::new(HIGH_RAM_START, HIGH_RAM_SIZE),
+            joypad: Joypad::default(),
             lcd: Lcd::new(),
             serial: Serial::default(),
             sound: Sound::default(),
@@ -115,6 +123,10 @@ impl Addressable for Bus {
             ECHO_RAM_START...ECHO_RAM_END => self.work_ram.read(addr - 0x2000),
             // 0xFE00 - 0xFE9F Sprite OAM
             OAM_START...OAM_END => self.lcd.read(addr),
+            // 0xFEA0 - 0xFEFF UNUSED
+            UNUSED_START...UNUSED_END => 0,
+            // 0xFF00 Joypad
+            IO_JOYPAD => self.joypad.read(addr),
             // 0xFF01 - 0xFF02 Serial IO ports
             IO_SERIAL_START...IO_SERIAL_END => self.serial.read(addr),
             // 0xFF04 - 0xFF07 Timer IO ports
@@ -122,14 +134,14 @@ impl Addressable for Bus {
             // 0xFF40 - 0xFE9F Video IO ports
             IO_VIDEO_START...IO_VIDEO_END => self.lcd.read(addr),
             // 0xFF0F IF IO port
-            IO_IF_ADDR => self.io_if,
+            IO_IF_ADDR => self.io_if | 0b11100000,
             // 0xFF10 - 0xFF3F Sound IO ports
             IO_SOUND_START...IO_SOUND_END => self.sound.read(addr),
             // 0xFF80 - 0xFFFE High RAM
             HIGH_RAM_START...HIGH_RAM_END => self.high_ram.read(addr),
             // 0xFFFF IE IO port
             IO_IE_ADDR => self.io_ie,
-            _ => { println!("Unimplemented read ({:#X})", addr); 0 }
+            _ => { println!("Unimplemented read ({:#X})", addr); 0xFF }
         }
     }
 
@@ -147,14 +159,28 @@ impl Addressable for Bus {
             ECHO_RAM_START...ECHO_RAM_END => self.work_ram.write(addr - 0x2000, val),
             // 0xFE00 - 0xFE9F Sprite OAM
             OAM_START...OAM_END => self.lcd.write(addr, val),
+            // 0xFEA0 - 0xFEFF UNUSED
+            UNUSED_START...UNUSED_END => { },
+            // 0xFF00 Joypad
+            IO_JOYPAD => self.joypad.write(addr, val),
             // 0xFF01 - 0xFF02 Serial IO ports
             IO_SERIAL_START...IO_SERIAL_END => self.serial.write(addr, val),
             // 0xFF04 - 0xFF07 Timer IO ports
             IO_TIMER_START...IO_TIMER_END => self.timer.write(addr, val),
             // 0xFF40 - 0xFE9F Video IO ports
-            IO_VIDEO_START...IO_VIDEO_END => self.lcd.write(addr, val),
+            IO_VIDEO_START...IO_VIDEO_END => {
+                if addr == ADDR_DMA {
+                    for lsb in 0..0xA0 {
+                        let src_val = self.read(((val as u16) << 8) | lsb);
+                        self.write(0xFE00 | lsb, src_val);
+                    }
+                    self.lcd.write(addr, val);
+                } else {
+                    self.lcd.write(addr, val);
+                }
+            },
             // 0xFF0F IF IO port
-            IO_IF_ADDR => self.io_if = val,
+            IO_IF_ADDR => self.io_if = val & 0b11111,
             // 0xFF10 - 0xFF3F Sound IO ports
             IO_SOUND_START...IO_SOUND_END => self.sound.write(addr, val),
             // 0xFF80 - 0xFFFE High RAM
