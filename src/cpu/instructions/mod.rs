@@ -281,8 +281,8 @@ pub fn decode(opcode: u8, prefixed: bool, mut next: &mut FnMut() -> u8) -> Optio
                 (0, 6, 7, _, _) => Some(Scf),
                 (0, 7, 7, _, _) => Some(Ccf),
                 // X=1
-                (1, _, _, _, _) if !(z == 6 && x == 6) => Some(Ld8(reg_addr_table(y), reg_addr_table(z))),
-                (1, _, _, _, _) if z == 6 && x == 6 => Some(Halt),
+                (1, _, _, _, _) if !(z == 6 && y == 6) => Some(Ld8(reg_addr_table(y), reg_addr_table(z))),
+                (1, _, _, _, _) if z == 6 && y == 6 => Some(Halt),
                 // X=2
                 (2, _, _, _, _) => decode_alu(y, reg_addr_table(z)),
                 // X=3, Z=0

@@ -122,8 +122,11 @@ impl Cpu {
             }
         // An an interrupt is pending, interrupts are disabled, and the CPU is halted, then unhalt the CPU
         } else if interrupt.is_some() & !self.ime && self.halted {
-            self.halted = true;
+            self.halted = false;
             4
+        // CPU is halted and there's no interrupt
+        } else if self.halted {
+            1
         // Else execute the next instruction
         } else {
             let pc = self.regs.pc();
