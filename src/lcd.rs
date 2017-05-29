@@ -169,6 +169,11 @@ impl Lcd {
                             self.draw_background(framebuffer);
                         }
 
+                        if self.lcdc.contains(LCDC_SPRITE_DISPLAY) {
+                            self.draw_sprites(framebuffer);
+                        }
+
+
                         self.draw_borders(framebuffer);
                     } else { 
                         self.mode = Mode::Oam;
@@ -259,6 +264,24 @@ impl Lcd {
         }
     }
 
+    // TODO: handle transparancy, priority, 8x16 mode
+    fn draw_sprites(&self, framebuffer: &mut [u32]) {
+        // Sprites are 40 blocks in OAM. Each block is 32 bits
+        for idx in 0..40 {
+            let y = self.oam[idx * 4];
+            let x = self.oam[(idx * 4) + 1];
+            let pattern =  self.oam[(idx * 4) + 2];
+            let flags = self.oam[(idx * 4) + 3];
+
+            if x > 0 && y > 0 {
+                let tile_addr = 0x8000 + ((pattern as u16) * 16);
+                let tile = (0..16).map(|idx| self.read((tile_addr as u16) + (idx as u16))).collect::<Vec<u8>>();
+
+                self.draw_tile(framebuffer, &tile, x.wrapping_sub(8) as usize, y.wrapping_sub(16) as usize);
+            }
+        }
+    }
+
     fn draw_tile(&self, framebuffer: &mut [u32], tile: &Vec<u8>, x: usize, y: usize) {
         for tile_y in 0..8 {
             let upper_byte = tile[(tile_y * 2) + 1];
@@ -266,21 +289,25 @@ impl Lcd {
 
             for tile_x in 0..8 {
                 let fb_idx = ((y + tile_y) * BUFFER_WIDTH) + x + tile_x;
-                let shift = 7 - tile_x;
-                let mask = 1 << shift;
-                let upper_bit = (upper_byte & mask) >> shift;
-                let lower_bit = (lower_byte & mask) >> shift;
-                let shade = (upper_bit << 1) | lower_bit;
+                if fb_idx < 65536 {
+                    let shift = 7 - tile_x;
+                    let mask = 1 << shift;
+                    let upper_bit = (upper_byte & mask) >> shift;
+                    let lower_bit = (lower_byte & mask) >> shift;
+                    let shade = (upper_bit << 1) | lower_bit;
 
-                let color = match shade {
-                    SHADE_WHITE => 0xFFFFFF,
-                    SHADE_LIGHT_GRAY => 0xDDDDDD,
-                    SHADE_DARK_GRAY => 0xCCCCCC,
-                    SHADE_BLACK => 0x000000,
-                    _ => 0xFFFFFF
-                };
+                    let color = match shade {
+                        SHADE_WHITE => 0xFFFFFF,
+                        SHADE_LIGHT_GRAY => 0xDDDDDD,
+                        SHADE_DARK_GRAY => 0xCCCCCC,
+                        SHADE_BLACK => 0x000000,
+                        _ => 0xFFFFFF
+                    };
 
-                framebuffer[fb_idx] = color;
+                    framebuffer[fb_idx] = color;
+                } else {
+                    println!("Attempted tile write outside framebuffer length at index {:#X}", fb_idx);
+                }
             }
         }
     }

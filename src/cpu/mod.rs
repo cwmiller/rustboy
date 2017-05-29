@@ -36,7 +36,7 @@ impl fmt::Display for Condition {
 enum_from_primitive! {
 #[derive(Copy, Clone)]
 pub enum Interrupt {
-    Keypad = 0b00010000,
+    Joypad = 0b00010000,
     Serial = 0b00001000,
     Timer  = 0b00000100,
     Stat   = 0b00000010,
@@ -46,7 +46,7 @@ pub enum Interrupt {
 
 fn interrupt_start_address(interrupt: Interrupt) -> u16 {
     match interrupt {
-        Interrupt::Keypad => 0x60,
+        Interrupt::Joypad => 0x60,
         Interrupt::Serial => 0x58,
         Interrupt::Timer  => 0x50,
         Interrupt::Stat   => 0x48,
@@ -201,7 +201,7 @@ impl Cpu {
 
         let interrupts = bus.read(IO_IF_ADDR) & bus.read(IO_IE_ADDR);
         if interrupts > 0 {
-            let mut flag = Interrupt::Keypad as u8;
+            let mut flag = Interrupt::Joypad as u8;
             while flag > 0 {
                 if interrupts & flag == flag {
                     let interrupt = Interrupt::from_u8(flag).unwrap();

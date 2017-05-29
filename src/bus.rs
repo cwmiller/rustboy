@@ -98,7 +98,7 @@ impl Bus {
             io_ie: 0,
             io_if: 0,
             high_ram: Ram::new(HIGH_RAM_START, HIGH_RAM_SIZE),
-            joypad: Joypad::default(),
+            joypad: Joypad::new(),
             lcd: Lcd::new(),
             serial: Serial::default(),
             sound: Sound::default(),
