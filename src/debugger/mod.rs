@@ -3,7 +3,7 @@ mod command;
 use self::command::Command;
 use bus::{Addressable, Bus};
 use cpu::{Cpu, Instruction, decode};
-use std::collections::HashSet;
+use fnv::FnvHashSet;
 use std::io::{stdin, stdout, Write};
 use std::iter;
 use std::process;
@@ -14,7 +14,7 @@ enum State {
 }
 
 pub struct Debugger {
-    breakpoints: HashSet<u16>,
+    breakpoints: FnvHashSet<u16>,
     state: State,
     previous_command: Command
 }
@@ -22,7 +22,7 @@ pub struct Debugger {
 impl Debugger {
     pub fn new() -> Self {
         Debugger {
-            breakpoints: HashSet::new(),
+            breakpoints: FnvHashSet::default(),
             state: State::Running,
             previous_command: Command::Continue
         }

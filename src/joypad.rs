@@ -1,5 +1,4 @@
 use bus::Addressable;
-use minifb::Key;
 
 bitflags! {
     flags Pins: u8 {
@@ -17,6 +16,17 @@ pub struct StepResult {
     pub interrupt: bool
 }
 
+pub enum Button {
+    Start,
+    Select,
+    Up,
+    Right,
+    Down,
+    Left,
+    A,
+    B
+}
+
 pub struct Joypad {
     pins: Pins
 }
@@ -28,7 +38,7 @@ impl Joypad {
         }
     }
 
-    pub fn step(&mut self, keys: Vec<Key>) -> StepResult {
+    pub fn step(&mut self, keys: &Vec<Button>) -> StepResult {
         let mut result = StepResult::default();
         let previous = self.pins;
 
@@ -36,15 +46,14 @@ impl Joypad {
 
         for key in keys.iter() {
             let pins = match *key {
-                Key::Enter if self.pins.contains(PIN_15) => PIN_13,         // Start
-                Key::LeftShift
-                | Key::RightShift if self.pins.contains(PIN_15) => PIN_12,  // Select
-                Key::Up if self.pins.contains(PIN_14) => PIN_12,            // Up
-                Key::Right if self.pins.contains(PIN_14) => PIN_10,         // Right
-                Key::Down if self.pins.contains(PIN_14) => PIN_13,          // Down
-                Key::Left if self.pins.contains(PIN_14) => PIN_11,          // Left
-                Key::X if self.pins.contains(PIN_15) => PIN_10,             // A
-                Key::Z if self.pins.contains(PIN_15) => PIN_11,             // B
+                Button::Start if self.pins.contains(PIN_15) => PIN_13,
+                Button::Select if self.pins.contains(PIN_15) => PIN_12,
+                Button::Up if self.pins.contains(PIN_14) => PIN_12,
+                Button::Right if self.pins.contains(PIN_14) => PIN_10,
+                Button::Down if self.pins.contains(PIN_14) => PIN_13,
+                Button::Left if self.pins.contains(PIN_14) => PIN_11,
+                Button::A if self.pins.contains(PIN_15) => PIN_10,
+                Button::B if self.pins.contains(PIN_15) => PIN_11,
                 _ => Pins::empty()
             };
 

@@ -3,6 +3,7 @@ extern crate bitflags;
 extern crate byteorder;
 #[macro_use] 
 extern crate enum_primitive;
+extern crate fnv;
 #[macro_use]
 extern crate lazy_static;
 extern crate minifb;
@@ -22,6 +23,7 @@ use bus::Bus;
 use cartridge::Cartridge;
 use cpu::{Cpu, Interrupt};
 use debugger::Debugger;
+use joypad::Button;
 use lcd::{BUFFER_WIDTH, BUFFER_HEIGHT};
 use minifb::{Key, Scale, WindowOptions, Window};
 use std::env;
@@ -64,29 +66,21 @@ fn start_emu(cart: Cartridge) {
 
     cpu.reset();
 
-    // Used to debounce pause key
     let mut break_pressed = false;
     let mut start_time = Instant::now();
     let mut frames = 0;
+    let mut keys = Vec::new();
 
     while window.is_open() && !window.is_key_down(Key::Escape) {
-        if debugger.should_break(&cpu) || (window.is_key_down(Key::Pause) && !break_pressed) {
-            break_pressed = true;
-            debugger.brk(&mut cpu, &mut bus);
-        }
-
-        if !window.is_key_down(Key::Pause) {
+        if debugger.should_break(&cpu) || break_pressed {
             break_pressed = false;
+            debugger.brk(&mut cpu, &mut bus);
         }
 
         let cycles = cpu.step(&mut bus);
         let timer_result = bus.timer.step(cycles);
         let lcd_result = bus.lcd.step(cycles, &mut framebuffer);
-
-        // window.get_keys() causes major performance issues
-        // let keys = window.get_keys();
-        let keys = pressed_keys(&window);
-        let joypad_result = bus.joypad.step(keys);
+        let joypad_result = bus.joypad.step(&keys);
 
         if timer_result.interrupt {
             cpu.interrupt(&mut bus, Interrupt::Timer);
@@ -111,43 +105,50 @@ fn start_emu(cart: Cartridge) {
                 start_time = Instant::now();
                 frames = 0;
             }
+
+            pressed_keys(&mut keys, &window);
+
+            if window.is_key_down(Key::Pause) {
+                break_pressed = true;
+            }
         }
     }
 }
 
-fn pressed_keys(window: &Window) -> Vec<Key> {
-    let mut keys = Vec::new();
+#[inline(always)]
+fn pressed_keys<'a>(keys: &'a mut Vec<Button>, window: &Window) -> &'a Vec<Button> {
+    keys.clear();
 
     if window.is_key_down(Key::Enter) {
-        keys.push(Key::Enter);
+        keys.push(Button::Start);
     }
 
     if window.is_key_down(Key::RightShift) || window.is_key_down(Key::LeftShift) {
-        keys.push(Key::RightShift);
+        keys.push(Button::Select);
     }
 
     if window.is_key_down(Key::Up) {
-        keys.push(Key::Up);
+        keys.push(Button::Up);
     }
 
     if window.is_key_down(Key::Right) {
-        keys.push(Key::Right);
+        keys.push(Button::Right);
     }
 
     if window.is_key_down(Key::Down) {
-        keys.push(Key::Down);
+        keys.push(Button::Down);
     }
 
     if window.is_key_down(Key::Left) {
-        keys.push(Key::Left);
+        keys.push(Button::Left);
     }
 
     if window.is_key_down(Key::Z) {
-        keys.push(Key::Z);
+        keys.push(Button::B);
     }
 
     if window.is_key_down(Key::X) {
-        keys.push(Key::X);
+        keys.push(Button::A);
     }
 
     keys
