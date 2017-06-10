@@ -27,18 +27,31 @@ use joypad::Button;
 use lcd::{BUFFER_WIDTH, BUFFER_HEIGHT};
 use minifb::{Key, Scale, WindowOptions, Window};
 use std::env;
+use std::path::Path;
 use std::process;
 use std::time::Instant;
 
 fn main() {
     if env::args().len() < 2 {
-        println!("Usage: {} [ROM]", env::args().nth(0).unwrap());
-        process::exit(1);
-    } 
+        let bin_arg = env::args().nth(0).unwrap();
+        let bin_path = Path::new(bin_arg.as_str());
 
-    let rom_path = env::args().nth(1).unwrap();
-    let cart = Cartridge::new(rom_path);
-    println!("Loaded {:?}", cart);
+        println!("Usage: {} [ROM]", bin_path.file_name().unwrap().to_str().unwrap());
+        process::exit(1);
+    }
+
+    let rom_arg = env::args().nth(1).unwrap();
+    let rom_path = Path::new(rom_arg.as_str());
+
+    if !rom_path.is_file()  {
+        println!("File {} does not exist.", rom_arg);
+        process::exit(1);
+    }
+
+    let cart = Cartridge::new(rom_arg.as_str());
+
+    println!("Loaded {}", rom_path.file_name().unwrap().to_str().unwrap());
+    println!("{:?}", cart);
 
     start_emu(cart);
 }

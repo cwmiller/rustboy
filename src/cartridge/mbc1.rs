@@ -5,7 +5,7 @@ struct BankSelection(u8);
 
 impl BankSelection {
     fn set_mode(&mut self, mode: BankMode) {
-        self.0 = self.0 | ((mode as u8) << 7)
+        self.0 = (self.0 & 0b0111_1111) | ((mode as u8) << 7)
     }
 
     fn mode(&self) -> BankMode {
@@ -13,30 +13,30 @@ impl BankSelection {
     }
 
     fn set_upper(&mut self, val: u8) {
-        self.0 = (self.0 & 0b1000_1111) | ((val & 0b0111_0000) << 4);
+        self.0 = (self.0 & 0b1001_1111) | ((val << 5) & 0b0110_0000);
     }
 
     fn upper(&self) -> u8 {
-        (self.0 & 0b0111_0000) >> 4
+        (self.0 & 0b0110_0000) >> 5
     }
 
     fn set_lower(&mut self, val: u8) {
-        self.0 = (self.0 & 0b1111_0000) | (val & 0b0000_1111);
+        self.0 = (self.0 & 0b1110_0000) | (val & 0b0001_1111);
     }
 
     fn lower(&self) -> u8 {
-        self.0 & 0b0000_1111
+        self.0 & 0b0001_1111
     }
 
     fn rom_bank(&self) -> usize {
         let bank = if self.mode() == BankMode::Rom {
-            (self.upper() << 4) | self.lower()
+            (self.upper() << 5) | self.lower()
         } else {
             self.lower()
         };
 
         (match bank {
-            0x00 | 0x20 | 0x40 |0x60 => bank + 1,
+            0 | 0x20 | 0x40 | 0x60 => bank + 1,
             _ => bank
         }) as usize
     }
@@ -59,31 +59,33 @@ enum BankMode {
 }
 
 pub struct Mbc1 {
-    total_ram_banks: usize,
-    ram_bank_size: usize,
+    rom_banks: usize,
+    ram_banks: usize,
     ram_enabled: bool,
     ram_data: Vec<u8>,
-
     bank_selection: BankSelection
 }
 
 impl Mbc1 {
-    pub fn new(ram_banks: usize, ram_bank_size: usize) -> Self {
+    pub fn new(rom_banks: usize, ram_banks: usize) -> Self {
         Mbc1 {
-            total_ram_banks: ram_banks,
-            ram_bank_size: ram_bank_size,
+            rom_banks: rom_banks,
+            ram_banks: ram_banks,
             ram_enabled: false,
-            ram_data: vec![0; (ram_bank_size * ram_banks)],
+            ram_data: vec![0; (ram_banks * 0x2000)],
             bank_selection: BankSelection(0)
         }
     }
 
     fn rom_index(&self, addr: u16) -> usize {
-        ((addr as usize) - 0x4000) + (self.bank_selection.rom_bank() * 0x4000)
+        let bank = self.bank_selection.rom_bank() & (self.rom_banks - 1);
+        ((addr as usize) - 0x4000) + (bank * 0x4000)
     }
 
     fn ram_index(&self, addr: u16) -> usize {
-        (addr as usize) + (self.bank_selection.ram_bank() * self.ram_bank_size) - 0xA000
+        let bank = self.bank_selection.ram_bank() & (self.ram_banks - 1);
+
+        ((addr as usize) - 0xA000) + (bank * 0x2000)
     }
 }
 
@@ -96,15 +98,14 @@ impl Mapper for Mbc1 {
             },
             0x4000...0x7FFF => {
                 // Switchable ROM bank
-                let index = self.rom_index(addr);
-                rom[index]
+                rom[self.rom_index(addr)]
             },
             0xA000...0xBFFF => {
                 // Switchable RAM bank
                 if self.ram_enabled {
                     self.ram_data[self.ram_index(addr)]
                 } else {
-                    0
+                    0xFF
                 }
             },
             _ => panic!("Address {:#X} not handled by MBC1")
@@ -128,7 +129,7 @@ impl Mapper for Mbc1 {
             },
             0x6000...0x7FFF => {
                 // Writing to this space toggles RAM/ROM bank mode. 1 = RAM mode
-                self.bank_selection.set_mode(BankMode::from_u8(val).unwrap_or_else(|| panic!("Unknown bank mode: {:#X}", val)));
+                self.bank_selection.set_mode(BankMode::from_u8(val & 1).unwrap_or_else(|| panic!("Unknown bank mode: {:#X}", val)));
             },
             0xA000...0xBFFF => {
                 // Write to RAM Bank
