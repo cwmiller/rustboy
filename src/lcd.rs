@@ -65,15 +65,22 @@ const SHADE_LIGHT_GRAY: u8 = 1;
 const SHADE_DARK_GRAY: u8  = 2;
 const SHADE_BLACK: u8      = 3;
 
-struct Pallete(u8);
+#[derive(Copy, Clone)]
+struct Palette(u8);
 
-impl Pallete {
+impl Palette {
     fn shade(&self, idx: u8) -> u8 {
-        self.0 >> (idx * 2)
+        self.0 >> (idx * 2) & 0b11
     }
 
-    fn set_shade(&mut self, idx: u8, shade: u8) {
-        self.0 = self.0 | shade << (idx * 2);
+    fn rgb(&self, idx: u8) -> u32 {
+        match idx {
+            SHADE_WHITE      => 0x9CBD0F,
+            SHADE_LIGHT_GRAY => 0x8CAD0F,
+            SHADE_DARK_GRAY  => 0x306230,
+            SHADE_BLACK      => 0x0F380F,
+            _                => unreachable!()
+        }
     }
 }
 
@@ -92,9 +99,9 @@ pub struct Lcd {
     scx: u8,
     ly: u8,
     lyc: u8,
-    bgp: Pallete,
-    obp0: Pallete,
-    obp1: Pallete,
+    bgp: Palette,
+    obp0: Palette,
+    obp1: Palette,
     wy: u8,
     wx: u8,
     dma: u8,
@@ -114,9 +121,9 @@ impl Lcd {
             scx: 0,
             ly: 0,
             lyc: 0,
-            bgp: Pallete(0xFC),
-            obp0: Pallete(0xFF),
-            obp1: Pallete(0xFF),
+            bgp: Palette(0xFC),
+            obp0: Palette(0xFF),
+            obp1: Palette(0xFF),
             wy: 0,
             wx: 0,
             dma: 0,
@@ -242,29 +249,37 @@ impl Lcd {
             0x9C00
         } else {
             0x9800
-        };
+        } as u16;
 
         let tile_addr_base = if self.lcdc.contains(LCDC_UNSIGNED_TILE_DATA) {
             0x8000
         } else {
             0x9000
-        };
+        } as u16;
 
         for y in 0..32 {
             for x in 0..32 {
                 let fb_top_left_y = y as usize * 8;
                 let fb_top_left_x = x as usize * 8;
 
-                let tile_idx = self.read(map_addr_base + ((y * 32) + x)) as u16;
-                let tile_addr = tile_addr_base + tile_idx * 16;
+                let tile_idx = self.read(map_addr_base + ((y * 32) + x)) as u8;
+
+                let tile_addr = if self.lcdc.contains(LCDC_UNSIGNED_TILE_DATA) {
+                    (tile_addr_base + ((tile_idx as u16) * 16))
+                } else {
+                    let signed_idx = (tile_idx as i8) as i16;
+                    ((tile_addr_base as i16) + ((signed_idx) * 16)) as u16
+
+                };
+
                 let tile = (0..16).map(|idx| self.read(tile_addr + (idx as u16))).collect::<Vec<u8>>();
 
-                self.draw_tile(framebuffer, &tile, fb_top_left_x, fb_top_left_y);
+                self.draw_tile(framebuffer, &tile, self.bgp, fb_top_left_x, fb_top_left_y, false);
             }
         }
     }
 
-    // TODO: handle transparancy, priority, 8x16 mode
+    // TODO: handle priority, 8x16 mode
     fn draw_sprites(&self, framebuffer: &mut [u32]) {
         // Sprites are 40 blocks in OAM. Each block is 32 bits
         for idx in 0..40 {
@@ -276,13 +291,16 @@ impl Lcd {
             if x > 0 && y > 0 {
                 let tile_addr = 0x8000 + ((pattern as u16) * 16);
                 let tile = (0..16).map(|idx| self.read((tile_addr as u16) + (idx as u16))).collect::<Vec<u8>>();
+                let screen_x = x.wrapping_sub(8) as usize;
+                let screen_y = y.wrapping_sub(16) as usize;
+                let palette = if flags & 0b10000 == 0b10000 { self.obp1 } else { self.obp0 };
 
-                self.draw_tile(framebuffer, &tile, x.wrapping_sub(8) as usize, y.wrapping_sub(16) as usize);
+                self.draw_tile(framebuffer, &tile, palette, screen_x, screen_y, true);
             }
         }
     }
 
-    fn draw_tile(&self, framebuffer: &mut [u32], tile: &Vec<u8>, x: usize, y: usize) {
+    fn draw_tile(&self, framebuffer: &mut [u32], tile: &Vec<u8>, palette: Palette, x: usize, y: usize, transparent: bool) {
         for tile_y in 0..8 {
             let upper_byte = tile[(tile_y * 2) + 1];
             let lower_byte = tile[tile_y * 2];
@@ -294,17 +312,11 @@ impl Lcd {
                     let mask = 1 << shift;
                     let upper_bit = (upper_byte & mask) >> shift;
                     let lower_bit = (lower_byte & mask) >> shift;
-                    let shade = (upper_bit << 1) | lower_bit;
+                    let shade_idx = (upper_bit << 1) | lower_bit;
 
-                    let color = match shade {
-                        SHADE_WHITE => 0xFFFFFF,
-                        SHADE_LIGHT_GRAY => 0xDDDDDD,
-                        SHADE_DARK_GRAY => 0xCCCCCC,
-                        SHADE_BLACK => 0x000000,
-                        _ => 0xFFFFFF
-                    };
-
-                    framebuffer[fb_idx] = color;
+                    if !(shade_idx == 0 && transparent) {
+                        framebuffer[fb_idx] = palette.rgb(shade_idx);
+                    }
                 } else {
                     println!("Attempted tile write outside framebuffer length at index {:#X}", fb_idx);
                 }
@@ -374,9 +386,9 @@ impl Addressable for Lcd {
             ADDR_LY => (), // read-only
             ADDR_LYC => self.lyc = val,
             ADDR_DMA => { self.dma = val }, // Actual transfer is done by the Bus object
-            ADDR_BGP => self.bgp = Pallete(val),
-            ADDR_OBP0 => self.obp0 = Pallete(val),
-            ADDR_OBP1 => self.obp1 = Pallete(val),
+            ADDR_BGP => self.bgp = Palette(val),
+            ADDR_OBP0 => self.obp0 = Palette(val),
+            ADDR_OBP1 => self.obp1 = Palette(val),
             ADDR_WY => self.wy = val,
             ADDR_WX => self.wx = val,
             _ => println!("LCD IO write unimplemented {:#X} -> {:#X}", val, addr)

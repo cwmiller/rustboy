@@ -90,9 +90,10 @@ impl fmt::Debug for Cartridge {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         let mapper = self.mapper_type();
 
-        write!(f, "Name: {}\nMapper: {}\nROM Banks: {} ({:#X})\nRAM Banks: {} ({:#X})\nGBC: {}\nSGB: {}",
+        write!(f, "Name: {}\nMapper: {} ({:#X})\nROM Banks: {} ({:#X})\nRAM Banks: {} ({:#X})\nGBC: {}\nSGB: {}",
             self.name(),
             if mapper.is_some() { mapper.unwrap().to_string() } else { "None".to_string() },
+            self.rom[0x147],
             self.total_rom_banks(),
             self.rom[0x148],
             self.rom[0x149],

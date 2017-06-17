@@ -62,7 +62,7 @@ fn start_emu(cart: Cartridge) {
                                  BUFFER_WIDTH,
                                  BUFFER_HEIGHT,
                                  WindowOptions {
-                                     scale: Scale::X1,
+                                     scale: Scale::X2,
                                      ..WindowOptions::default()
                                  }).unwrap_or_else(|e| {
         panic!("{}", e);
