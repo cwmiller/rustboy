@@ -78,13 +78,20 @@ impl Mbc1 {
     }
 
     fn rom_index(&self, addr: u16) -> usize {
-        let bank = self.bank_selection.rom_bank() & (self.rom_banks - 1);
+        let bank = if self.rom_banks == 0 {
+            1
+        } else {
+            self.bank_selection.rom_bank() & (self.rom_banks - 1)
+        };
         ((addr as usize) - 0x4000) + (bank * 0x4000)
     }
 
     fn ram_index(&self, addr: u16) -> usize {
-        let bank = self.bank_selection.ram_bank() & (self.ram_banks - 1);
-
+        let bank = if self.ram_banks == 0 {
+            1
+        } else {
+            self.bank_selection.ram_bank() & (self.ram_banks - 1)
+        };
         ((addr as usize) - 0xA000) + (bank * 0x2000)
     }
 }
