@@ -80,8 +80,7 @@ static PREFIXED_CYCLES: &'static [usize] = &[
 pub struct Cpu {
     pub regs: Registers,
     ime: bool,
-    halted: bool,
-    prefixed: bool
+    halted: bool
 }
 
 impl Cpu {
@@ -89,8 +88,7 @@ impl Cpu {
         Cpu {
             regs: Registers::default(),
             halted: false,
-            ime: true,
-            prefixed: false
+            ime: true
         }
     }
 
@@ -102,7 +100,6 @@ impl Cpu {
         self.regs.set_sp(0xFFFE);
         self.regs.set_pc(0x100);
         self.ime = true;
-        self.prefixed = false;
     }
 
     pub fn step(&mut self, bus: &mut Bus) -> usize {
@@ -130,11 +127,18 @@ impl Cpu {
         // Else execute the next instruction
         } else {
             let pc = self.regs.pc();
-            let opcode = bus.read(pc);
+            let mut opcode = bus.read(pc);
             let mut length = 1;
+            let mut prefixed = false;
+
+            if opcode == 0xCB {
+                prefixed = true;
+                length = length + 1;
+                opcode = bus.read(pc.wrapping_add(1));
+            }
 
             let cycles =
-                if self.prefixed {
+                if prefixed {
                     PREFIXED_CYCLES[opcode as usize & 0x0F]
                 } else {
                     CYCLES[opcode as usize]
@@ -147,13 +151,12 @@ impl Cpu {
                     byte
                 };
 
-                inst::decode(opcode, self.prefixed, &mut next)
+                inst::decode(opcode, prefixed, &mut next)
             };
 
             self.regs.set_pc(pc + length);
 
             if let Some(instruction) = decoded_instruction {
-                //println!("{:#X}: {}", pc, instruction);
                 inst::execute(self, bus, instruction);
             }
 
@@ -235,9 +238,8 @@ impl Cpu {
 
 impl fmt::Debug for Cpu {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        writeln!(f, "Ints: {}\tPrefixed: {}",
-            if self.ime { "Enabled" } else { "Disabled" },
-            if self.prefixed { "Yes" } else { "No" },
+        writeln!(f, "Interrupts: {}",
+            if self.ime { "Enabled" } else { "Disabled" }
         )?;
 
         writeln!(f, "Registers:")?;

@@ -18,12 +18,6 @@ pub fn halt(cpu: &mut Cpu) {
     cpu.halted = true;
 }
 
-// PREFIX CB
-#[inline(always)]
-pub fn prefix(cpu: &mut Cpu) {
-    cpu.prefixed = true;
-}
-
 // DI
 pub fn di(cpu: &mut Cpu) {
     cpu.ime = false;

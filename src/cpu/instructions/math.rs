@@ -226,7 +226,6 @@ pub fn daa(cpu: &mut Cpu) {
     cpu.regs.set_carry((a & 0x100) == 0x100);
     cpu.regs.set_halfcarry(false);
     cpu.regs.set_zero((a & 0xFF) == 0);
-
 }
 
 // SCF

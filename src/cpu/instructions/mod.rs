@@ -59,7 +59,6 @@ pub enum Instruction {
     Jp(Condition, Box<AddressingMode<u16>>),
     Di,
     Ei,
-    Prefix,
     Call(Condition, Box<AddressingMode<u16>>),
     Push(Box<AddressingMode<u16>>),
     Rst(u8),
@@ -137,7 +136,6 @@ impl fmt::Display for Instruction {
             },
             Di => write!(f, "DI"),
             Ei => write!(f, "EI"),
-            Prefix => write!(f, "PREFIX CB"),
             Call(ref cond, ref addr) => {
                 if *cond == Condition::None {
                     write!(f, "CALL {}", addr)
@@ -305,7 +303,6 @@ pub fn decode(opcode: u8, prefixed: bool, mut next: &mut FnMut() -> u8) -> Optio
                 (3, 7, 2, _, _) => Some(Ld8(reg_addr(A), ind16_addr(next16(&mut next)))),
                 // X=3, Z=3
                 (3, 0, 3, _, _) => Some(Jp(Condition::None, imm16_addr(next16(&mut next)))),
-                (3, 1, 3, _, _) => Some(Prefix),
                 (3, 6, 3, _, _) => Some(Di),
                 (3, 7, 3, _, _) => Some(Ei),
                 // X=3, Z=4
@@ -402,7 +399,6 @@ pub fn execute(cpu: &mut Cpu, bus: &mut Bus, instruction: Instruction) {
         Jp(cond, addr) => jp(cpu, bus, cond, addr.as_ref()),
         Di => di(cpu),
         Ei => ei(cpu),
-        Prefix => prefix(cpu),
         Call(cond, addr) => call(cpu, bus, cond, addr.as_ref()),
         Push(reg) => push(cpu, bus, reg.as_ref()),
         Rst(index) => rst(cpu, bus, index),

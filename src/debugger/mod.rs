@@ -118,13 +118,19 @@ impl Debugger {
 
     fn print_disassembly(&self, bus: &Bus, addr: u16, count: usize) {
         let mut instruction_addr = addr;
-        let mut prefixed = false;
 
         for _ in 0..count {
-            let opcode = bus.read(instruction_addr);
+            let mut opcode = bus.read(instruction_addr);
+            let mut prefixed = false;
 
             let (decoded_instruction, length) = {
                 let mut length = 1;
+
+                if opcode == 0xCB {
+                    opcode = bus.read(instruction_addr.wrapping_add(1));
+                    length = length + 1;
+                    prefixed = true;
+                }
 
                 ({
                     let mut next = || {
@@ -142,11 +148,6 @@ impl Debugger {
                 let padding = iter::repeat(" ").take(10 - (length as usize * 2)).collect::<String>();
                 
                 println!("{:#06X}\t{}{}{}", instruction_addr, hex, padding, instruction);
-
-                prefixed = match instruction {
-                    Instruction::Prefix => true,
-                    _ => false
-                };
             }
 
             instruction_addr = instruction_addr + length;

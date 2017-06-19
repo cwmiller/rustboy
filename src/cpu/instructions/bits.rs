@@ -72,7 +72,6 @@ pub fn rlc(cpu: &mut Cpu, bus: &mut Bus, reg: &AddressingMode<u8>) {
     cpu.regs.set_halfcarry(false);
     cpu.regs.set_subtract(false);
     cpu.regs.set_zero(shifted == 0);
-    cpu.prefixed = false;
 }
 
 // RRC
@@ -87,7 +86,6 @@ pub fn rrc(cpu: &mut Cpu, bus: &mut Bus, reg: &AddressingMode<u8>) {
     cpu.regs.set_halfcarry(false);
     cpu.regs.set_subtract(false);
     cpu.regs.set_zero(shifted == 0);
-    cpu.prefixed = false;
 }
 
 // RL
@@ -102,7 +100,6 @@ pub fn rl(cpu: &mut Cpu, bus: &mut Bus, reg: &AddressingMode<u8>) {
     cpu.regs.set_halfcarry(false);
     cpu.regs.set_subtract(false);
     cpu.regs.set_zero(shifted == 0);
-    cpu.prefixed = false;
 }
 
 // RR
@@ -117,7 +114,6 @@ pub fn rr(cpu: &mut Cpu, bus: &mut Bus, reg: &AddressingMode<u8>) {
     cpu.regs.set_halfcarry(false);
     cpu.regs.set_subtract(false);
     cpu.regs.set_zero(shifted == 0);
-    cpu.prefixed = false;
 }
 
 // SLA
@@ -132,7 +128,6 @@ pub fn sla(cpu: &mut Cpu, bus: &mut Bus, reg: &AddressingMode<u8>) {
     cpu.regs.set_halfcarry(false);
     cpu.regs.set_subtract(false);
     cpu.regs.set_zero(shifted == 0);
-    cpu.prefixed = false;
 }
 
 // SRA
@@ -147,7 +142,6 @@ pub fn sra(cpu: &mut Cpu, bus: &mut Bus, reg: &AddressingMode<u8>) {
     cpu.regs.set_halfcarry(false);
     cpu.regs.set_subtract(false);
     cpu.regs.set_zero(shifted == 0);
-    cpu.prefixed = false;
 }
 
 // SWAP
@@ -163,7 +157,6 @@ pub fn swap(cpu: &mut Cpu, bus: &mut Bus, reg: &AddressingMode<u8>) {
     cpu.regs.set_halfcarry(false);
     cpu.regs.set_subtract(false);
     cpu.regs.set_zero(swapped == 0);
-    cpu.prefixed = false;
 }
 
 // SRL
@@ -178,7 +171,6 @@ pub fn srl(cpu: &mut Cpu, bus: &mut Bus, reg: &AddressingMode<u8>) {
     cpu.regs.set_halfcarry(false);
     cpu.regs.set_subtract(false);
     cpu.regs.set_zero(shifted == 0);
-    cpu.prefixed = false;
 }
 
 // BIT
@@ -190,19 +182,16 @@ pub fn bit(cpu: &mut Cpu, bus: &mut Bus, bit: u8, reg: &AddressingMode<u8>) {
     cpu.regs.set_halfcarry(true);
     cpu.regs.set_subtract(false);
     cpu.regs.set_zero(val & test == 0);
-    cpu.prefixed = false;
 }
 
 // RES
 pub fn res(cpu: &mut Cpu, bus: &mut Bus, bit: u8, reg: &AddressingMode<u8>) {
     let val = reg.read(cpu, bus);
     reg.write(cpu, bus, val & !(1 << bit));
-    cpu.prefixed = false;
 }
 
 // SET
 pub fn set(cpu: &mut Cpu, bus: &mut Bus, bit: u8, reg: &AddressingMode<u8>) {
     let val = reg.read(cpu, bus);
     reg.write(cpu, bus, val | (1 << bit));
-    cpu.prefixed = false;
 }
