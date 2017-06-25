@@ -199,33 +199,33 @@ pub fn dec_16(cpu: &mut Cpu, bus: &mut Bus, dest: &AddressingMode<u16>) {
 
 // DAA
 // Flags affected: Z, H, C
-// Based off blargg's code http://forums.nesdev.com/viewtopic.php?p=41926#p41926
 #[inline(always)]
 pub fn daa(cpu: &mut Cpu) {
-    let mut a = cpu.regs.a() as u16;
+    let mut a = cpu.regs.a();
+    let mut adjustment = if cpu.regs.carry() { 0x60 } else { 0x00 };
 
-    if !cpu.regs.subtract() {
-        if cpu.regs.halfcarry() || (a & 0xF) > 9 {
-            a = a.wrapping_add(0x06);
-        }
-
-        if cpu.regs.carry() || a > 0x9F {
-            a = a.wrapping_add(0x60);
-        }
-    } else {
-        if cpu.regs.halfcarry() {
-            a = a.wrapping_sub(6) & 0xFF;
-        }
-
-        if cpu.regs.carry() {
-            a = a.wrapping_sub(0x60);
-        }
+    if cpu.regs.halfcarry() { 
+        adjustment |= 0x06; 
     }
 
-    cpu.regs.set_a((a & 0xFF) as u8);
-    cpu.regs.set_carry((a & 0x100) == 0x100);
+    if !cpu.regs.subtract() {
+        if a & 0x0F > 0x09 { 
+            adjustment |= 0x06;
+        }
+
+        if a > 0x99 { 
+            adjustment |= 0x60; 
+        }
+
+        a = a.wrapping_add(adjustment);
+    } else {
+        a = a.wrapping_sub(adjustment);
+    }
+
+    cpu.regs.set_a(a);
+    cpu.regs.set_carry(adjustment >= 0x60);
     cpu.regs.set_halfcarry(false);
-    cpu.regs.set_zero((a & 0xFF) == 0);
+    cpu.regs.set_zero(a == 0);
 }
 
 // SCF

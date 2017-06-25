@@ -2,7 +2,7 @@ mod command;
 
 use self::command::Command;
 use bus::{Addressable, Bus};
-use cpu::{Cpu, Instruction, decode};
+use cpu::{Cpu, decode};
 use fnv::FnvHashSet;
 use std::io::{stdin, stdout, Write};
 use std::iter;
