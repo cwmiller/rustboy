@@ -1,11 +1,8 @@
 use bus::{Addressable, OAM_START, OAM_END, VIDEO_RAM_START, VIDEO_RAM_END};
 use enum_primitive::FromPrimitive;
 
-pub const BUFFER_WIDTH: usize = 256;
-pub const BUFFER_HEIGHT: usize = 256;
-
-pub const LCD_WIDTH: usize = 160;
-pub const LCD_HEIGHT: usize = 144;
+pub const SCREEN_WIDTH: usize = 160;
+pub const SCREEN_HEIGHT: usize = 144;
 
 const ADDR_LCDC: u16 = 0xFF40;
 const ADDR_STAT: u16 = 0xFF41;
@@ -55,31 +52,31 @@ pub enum Mode {
 }
 }
 
+enum_from_primitive! {
+#[derive(Copy, Clone, PartialEq)]
+enum Shade {
+    White       = 0,
+    LightGray   = 1,
+    DarkGray    = 2,
+    Black       = 3
+}
+}
+
 const CYCLES_PER_OAM_READ: usize = 80;
 const CYCLES_PER_TRANSFER: usize = 172;
 const CYCLES_PER_HBLANK: usize = 204;
 const CYCLES_PER_LINE: usize = 456;
 
-const SHADE_WHITE: u8      = 0;
-const SHADE_LIGHT_GRAY: u8 = 1;
-const SHADE_DARK_GRAY: u8  = 2;
-const SHADE_BLACK: u8      = 3;
-
 #[derive(Copy, Clone)]
 struct Palette(u8);
 
 impl Palette {
-    fn shade(&self, idx: u8) -> u8 {
-        self.0 >> (idx * 2) & 0b11
-    }
-
-    fn rgb(&self, idx: u8) -> u32 {
-        match idx {
-            SHADE_WHITE      => 0x9CBD0F,
-            SHADE_LIGHT_GRAY => 0x8CAD0F,
-            SHADE_DARK_GRAY  => 0x306230,
-            SHADE_BLACK      => 0x0F380F,
-            _                => unreachable!()
+    fn rgb(&self, shade: Shade) -> u32 {
+        match shade {
+            Shade::White        => 0x9CBD0F,
+            Shade::LightGray    => 0x8CAD0F,
+            Shade::DarkGray     => 0x306230,
+            Shade::Black        => 0x0F380F
         }
     }
 }
@@ -91,8 +88,8 @@ pub struct StepResult {
 }
 
 pub struct Lcd {
-    vram: Vec<u8>,
-    oam: Vec<u8>,
+    vram: [u8; (VIDEO_RAM_END - VIDEO_RAM_START) as usize + 1],
+    oam: [u8; (OAM_END - OAM_START) as usize + 1],
     lcdc: Lcdc,
     stat: Stat,
     scy: u8,
@@ -105,16 +102,16 @@ pub struct Lcd {
     wy: u8,
     wx: u8,
     dma: u8,
-
     mode: Mode,
-    mode_cycles: usize
+    mode_cycles: usize,
+    draw_pending: bool
 }
 
 impl Lcd {
     pub fn new() -> Self {
         Lcd {
-            vram: vec![0; (VIDEO_RAM_END - VIDEO_RAM_START) as usize + 1],
-            oam: vec![0; (OAM_END - OAM_START) as usize + 1],
+            vram: [0; (VIDEO_RAM_END - VIDEO_RAM_START) as usize + 1],
+            oam: [0; (OAM_END - OAM_START) as usize + 1],
             lcdc: Lcdc::from_bits(0x91).unwrap(),
             stat: Stat::empty(),
             scy: 0,
@@ -128,101 +125,168 @@ impl Lcd {
             wx: 0,
             dma: 0,
             mode: Mode::Oam,
-            mode_cycles: 0
+            mode_cycles: 0,
+            draw_pending: false
         }
     }
 
-    pub fn step(&mut self, cycles: usize, framebuffer: &mut [u32]) -> StepResult {
+    pub fn step(&mut self, cycles: usize, mut screen_buffer: &mut [u32]) -> StepResult {
         let mut result = StepResult::default();
-        let previous_mode = self.mode;
 
-        self.mode_cycles = self.mode_cycles + cycles;
+        if self.lcdc.contains(LCDC_ENABLED) {
+            let previous_mode = self.mode;
+            self.mode_cycles = self.mode_cycles + cycles;
 
-        match self.mode {
-            Mode::Oam => {
-                // Process starts with the LCD controller reading information from OAM.
-                // This lasts 77-83 cycles
-                if self.mode_cycles >= CYCLES_PER_OAM_READ {
-                    // Move onto transfer stage
-                    self.mode = Mode::Transfer;
-                    self.mode_cycles = 0;
-                }
-            },
-            Mode::Transfer => {
-                // Data is being actively read by the LCD driver from OAM & VRAM.
-                // This lasts 169-175 cycles
-                if self.mode_cycles >= CYCLES_PER_TRANSFER {
-                    // Once transfer is complete, enter HBLANK
-                    self.mode = Mode::HBlank;
-                    self.mode_cycles = 0;
-                }
-            },
-            Mode::HBlank => {
-                // LCD has reached the end of a line.
-                // HBlank phase lasts 201-207 cycles
-                if self.mode_cycles >= CYCLES_PER_HBLANK {
-                    // LCD is ready to begin the next line
-                    self.ly = self.ly + 1;
-                    self.mode_cycles = 0;
-
-                    // If the LCD has line 144, then enter VBLANK. Else, enter OAM read.
-                    if self.ly == 144 { 
-                        self.mode = Mode::VBlank;
-                        result.int_vblank = true;
-
-                        self.clear_framebuffer(framebuffer);
-
-                        if self.lcdc.contains(LCDC_BG_DISPLAY) {
-                            self.draw_background(framebuffer);
-                        }
-
-                        if self.lcdc.contains(LCDC_SPRITE_DISPLAY) {
-                            self.draw_sprites(framebuffer);
-                        }
-
-
-                        self.draw_borders(framebuffer);
-                    } else { 
-                        self.mode = Mode::Oam;
-                    };
-
-                    self.check_coincidence(&mut result);
-                }
-            },
-            Mode::VBlank => {
-                // LCD is writing to VBlank lines
-                if self.mode_cycles >= CYCLES_PER_LINE {
-                    self.mode_cycles = 0;
-                    self.ly = self.ly + 1;
-
-                    if self.ly > 153 {
-                        // Finished with VBlank. Enter OAM with the first line.
-                        self.ly = 0;
-                        self.mode = Mode::Oam;
+            match self.mode {
+                Mode::Oam => {
+                    // Process starts with the LCD controller reading information from OAM.
+                    // This lasts 77-83 cycles
+                    if self.mode_cycles >= CYCLES_PER_OAM_READ {
+                        // Move onto transfer stage
+                        self.mode = Mode::Transfer;
+                        self.mode_cycles = 0;
                     }
+                },
+                Mode::Transfer => {
+                    // Data is being actively read by the LCD driver from OAM & VRAM.
+                    // This lasts 169-175 cycles
+                    if self.mode_cycles >= CYCLES_PER_TRANSFER {
+                        // Once transfer is complete, enter HBLANK
+                        self.mode = Mode::HBlank;
+                        self.mode_cycles = 0;
+                        self.draw_pending = true;
+                    }
+                },
+                Mode::HBlank => {
+                    // LCD has reached the end of a line.
+                    // HBlank phase lasts 201-207 cycles
+                    if self.mode_cycles >= CYCLES_PER_HBLANK {
+                        // LCD is ready to begin the next line
+                        self.ly = self.ly + 1;
+                        self.mode_cycles = 0;
 
-                    self.check_coincidence(&mut result);
-                } 
+                        // If the LCD has line 144, then enter VBLANK. Else, enter OAM read.
+                        if self.ly == 144 { 
+                            self.mode = Mode::VBlank;
+                            self.mode_cycles = 0;
+                            result.int_vblank = true;
+
+                            if self.lcdc.contains(LCDC_SPRITE_DISPLAY) {
+                                self.draw_sprites(screen_buffer);
+                            }
+                        } else { 
+                            self.mode = Mode::Oam;
+                        };
+
+                        self.check_coincidence(&mut result);
+                    } else {
+                        if self.ly < 144 && self.draw_pending {
+                            if self.lcdc.contains(LCDC_BG_DISPLAY) {
+                                self.draw_background_line(screen_buffer);
+                            }
+
+                            self.draw_pending = false;
+                        }
+                    }
+                },
+                Mode::VBlank => {
+                    // LCD is writing to VBlank lines
+                    if self.mode_cycles >= CYCLES_PER_LINE {
+                        self.mode_cycles = 0;
+                        self.ly = self.ly + 1;
+
+                        if self.ly > 153 {
+                            // Finished with VBlank. Enter OAM with the first line.
+                            self.ly = 0;
+                            self.mode = Mode::Oam;
+                        }
+
+                        self.check_coincidence(&mut result);
+                    } 
+                }
             }
-        }
 
-        // Check if a new mode has been entered during this step.
-        // If so, an interrupt will be raised if the respective flag is set in the STAT register
-        if self.mode != previous_mode {
-            let flag = match self.mode {
-                Mode::VBlank   => Some(STAT_VBLANK_INT),
-                Mode::HBlank   => Some(STAT_HBLANK_INT),
-                Mode::Oam      => Some(STAT_OAM_INT),
-                Mode::Transfer => None
-            };
+            // Check if a new mode has been entered during this step.
+            // If so, an interrupt will be raised if the respective flag is set in the STAT register
+            if self.mode != previous_mode {
+                let flag = match self.mode {
+                    Mode::VBlank   => Some(STAT_VBLANK_INT),
+                    Mode::HBlank   => Some(STAT_HBLANK_INT),
+                    Mode::Oam      => Some(STAT_OAM_INT),
+                    Mode::Transfer => None
+                };
 
-            if flag.is_some() && self.stat.contains(flag.unwrap()) {
-                result.int_stat = true;
+                if flag.is_some() && self.stat.contains(flag.unwrap()) {
+                    result.int_stat = true;
+                }
             }
         }
 
         result
-        
+    }
+
+    fn draw_background_line(&self, screen_buffer: &mut [u32]) {
+        let map_y = self.scy.wrapping_add(self.ly);
+        let map_tile_y = (map_y / 8) as u16;
+        let tile_row = map_y & 7;
+
+        let map_addr_base = if self.lcdc.contains(LCDC_BG_TILE_9C) {
+            0x9C00
+        } else {
+            0x9800
+        } as u16;
+
+        for screen_x in 0..SCREEN_WIDTH {
+            let map_x = self.scx.wrapping_add(screen_x as u8);
+            let map_tile_x = (map_x / 8) as u16;
+            let tile_column = map_x & 7;
+
+            let tile_idx_addr = map_addr_base + (map_tile_y * 32) + map_tile_x;
+            let tile_idx = self.vram[(tile_idx_addr - VIDEO_RAM_START) as usize];
+            let tile_addr = self.bg_tile_address(tile_idx);
+            let shade = self.tile_pixel_shade(tile_addr, tile_row, tile_column);
+
+            screen_buffer[(self.ly as usize * SCREEN_WIDTH) + screen_x] = self.bgp.rgb(shade);
+        }
+    }
+
+    fn draw_sprites(&self, screen_buffer: &mut [u32]) {
+        // Sprites are 40 blocks in OAM. Each block is 32 bits
+        for idx in 0..40 {
+            let y = self.oam[idx * 4] as usize;
+            let x = self.oam[(idx * 4) + 1] as usize;
+            let pattern =  self.oam[(idx * 4) + 2];
+            let flags = self.oam[(idx * 4) + 3];
+
+            if x >= 8 && y >= 16 && x < 160 && y < 144 {
+                let tile_addr = self.sprite_tile_address(pattern);
+                let screen_x = x.wrapping_sub(8) as usize;
+                let screen_y = y.wrapping_sub(16) as usize;
+                let palette = if flags & 0b10000 == 0b10000 { self.obp1 } else { self.obp0 };
+
+                for row in 0..8 as usize {
+                    for column in 0..8 as usize {
+                        let shade = self.tile_pixel_shade(tile_addr, row as u8, column as u8);
+
+                        if shade != Shade::White {
+                            screen_buffer[((screen_y + row) * SCREEN_WIDTH) + screen_x + column] = palette.rgb(shade);
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    fn tile_pixel_shade(&self, address: u16, row: u8, column: u8) -> Shade {
+        let upper_byte = self.vram[((address + (row * 2) as u16) + 1 - VIDEO_RAM_START) as usize];
+        let lower_byte = self.vram[((address + (row * 2) as u16) - VIDEO_RAM_START) as usize];
+
+        let shift = 7 - column;
+        let mask = 1 << shift;
+        let upper_bit = (upper_byte & mask) >> shift;
+        let lower_bit = (lower_byte & mask) >> shift;
+
+        Shade::from_u8((upper_bit << 1) | lower_bit).unwrap()
     }
 
     fn check_coincidence(&mut self, result: &mut StepResult) {
@@ -238,116 +302,23 @@ impl Lcd {
         }
     }
 
-    fn clear_framebuffer(&self, framebuffer: &mut [u32]) {
-        for idx in 0..BUFFER_HEIGHT*BUFFER_WIDTH {
-            framebuffer[idx] = 0xFFFFFF;
-        }
-    }
-
-    fn draw_background(&self, framebuffer: &mut [u32]) {
-        let map_addr_base = if self.lcdc.contains(LCDC_BG_TILE_9C) {
-            0x9C00
-        } else {
-            0x9800
-        } as u16;
-
+    fn bg_tile_address(&self, tile_index: u8) -> u16 {
         let tile_addr_base = if self.lcdc.contains(LCDC_UNSIGNED_TILE_DATA) {
             0x8000
         } else {
             0x9000
         } as u16;
 
-        for y in 0..32 {
-            for x in 0..32 {
-                let fb_top_left_y = y as usize * 8;
-                let fb_top_left_x = x as usize * 8;
-
-                let tile_idx = self.read(map_addr_base + ((y * 32) + x)) as u8;
-
-                let tile_addr = if self.lcdc.contains(LCDC_UNSIGNED_TILE_DATA) {
-                    (tile_addr_base + ((tile_idx as u16) * 16))
-                } else {
-                    let signed_idx = (tile_idx as i8) as i16;
-                    ((tile_addr_base as i16) + ((signed_idx) * 16)) as u16
-
-                };
-
-                let tile = (0..16).map(|idx| self.read(tile_addr + (idx as u16))).collect::<Vec<u8>>();
-
-                self.draw_tile(framebuffer, &tile, self.bgp, fb_top_left_x, fb_top_left_y, false);
-            }
+        if self.lcdc.contains(LCDC_UNSIGNED_TILE_DATA) {
+            (tile_addr_base + ((tile_index as u16) * 16))
+        } else {
+            let signed_index = (tile_index as i8) as i16;
+            ((tile_addr_base as i16) + ((signed_index) * 16)) as u16
         }
     }
 
-    // TODO: handle priority, 8x16 mode
-    fn draw_sprites(&self, framebuffer: &mut [u32]) {
-        // Sprites are 40 blocks in OAM. Each block is 32 bits
-        for idx in 0..40 {
-            let y = self.oam[idx * 4];
-            let x = self.oam[(idx * 4) + 1];
-            let pattern =  self.oam[(idx * 4) + 2];
-            let flags = self.oam[(idx * 4) + 3];
-
-            if x > 0 && y > 0 {
-                let tile_addr = 0x8000 + ((pattern as u16) * 16);
-                let tile = (0..16).map(|idx| self.read((tile_addr as u16) + (idx as u16))).collect::<Vec<u8>>();
-                let screen_x = x.wrapping_sub(8) as usize;
-                let screen_y = y.wrapping_sub(16) as usize;
-                let palette = if flags & 0b10000 == 0b10000 { self.obp1 } else { self.obp0 };
-
-                self.draw_tile(framebuffer, &tile, palette, screen_x, screen_y, true);
-            }
-        }
-    }
-
-    fn draw_tile(&self, framebuffer: &mut [u32], tile: &Vec<u8>, palette: Palette, x: usize, y: usize, transparent: bool) {
-        for tile_y in 0..8 {
-            let upper_byte = tile[(tile_y * 2) + 1];
-            let lower_byte = tile[tile_y * 2];
-
-            for tile_x in 0..8 {
-                let fb_idx = ((y + tile_y) * BUFFER_WIDTH) + x + tile_x;
-                if fb_idx < 65536 {
-                    let shift = 7 - tile_x;
-                    let mask = 1 << shift;
-                    let upper_bit = (upper_byte & mask) >> shift;
-                    let lower_bit = (lower_byte & mask) >> shift;
-                    let shade_idx = (upper_bit << 1) | lower_bit;
-
-                    if !(shade_idx == 0 && transparent) {
-                        framebuffer[fb_idx] = palette.rgb(shade_idx);
-                    }
-                } else {
-                    println!("Attempted tile write outside framebuffer length at index {:#X}", fb_idx);
-                }
-            }
-        }
-    }
-
-    fn draw_borders(&self, framebuffer: &mut [u32]) {
-        let scy = self.scy as usize;
-        let scx = self.scx as usize;
-
-        for y_offset in 0..LCD_HEIGHT {
-            let y = if scy + y_offset >= LCD_HEIGHT {
-                (scy + y_offset) - LCD_HEIGHT
-            } else {
-                scy + y_offset
-            };
-
-            for x_offset in 0..LCD_WIDTH {
-                let x = if scx + x_offset >= LCD_WIDTH {
-                    (scx + x_offset) - LCD_WIDTH
-                } else {
-                    scx + x_offset
-                };
-
-                if y_offset == 0 || y_offset == LCD_HEIGHT - 1 || x_offset == 0 || x_offset == LCD_WIDTH - 1 {
-                    let idx = (y * BUFFER_WIDTH) + x;
-                    framebuffer[idx] = 0xFF0000;
-                }
-            }
-        }
+    fn sprite_tile_address(&self, tile_index: u8) -> u16 {
+        0x8000 + ((tile_index as u16) * 16)
     }
 }
 

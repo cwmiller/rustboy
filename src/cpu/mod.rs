@@ -154,7 +154,7 @@ impl Cpu {
                 inst::decode(opcode, prefixed, &mut next)
             };
 
-            self.regs.set_pc(pc + length);
+            self.regs.set_pc(pc.wrapping_add(length));
 
             if let Some(instruction) = decoded_instruction {
                 inst::execute(self, bus, instruction);

@@ -1,7 +1,7 @@
-#[macro_use] 
+#[macro_use]
 extern crate bitflags;
 extern crate byteorder;
-#[macro_use] 
+#[macro_use]
 extern crate enum_primitive;
 extern crate fnv;
 #[macro_use]
@@ -24,7 +24,7 @@ use cartridge::Cartridge;
 use cpu::{Cpu, Interrupt};
 use debugger::Debugger;
 use joypad::Button;
-use lcd::{BUFFER_WIDTH, BUFFER_HEIGHT};
+use lcd::{SCREEN_WIDTH, SCREEN_HEIGHT};
 use minifb::{Key, Scale, WindowOptions, Window};
 use std::env;
 use std::path::Path;
@@ -43,7 +43,7 @@ fn main() {
     let rom_arg = env::args().nth(1).unwrap();
     let rom_path = Path::new(rom_arg.as_str());
 
-    if !rom_path.is_file()  {
+    if !rom_path.is_file() {
         println!("File {} does not exist.", rom_arg);
         process::exit(1);
     }
@@ -57,21 +57,21 @@ fn main() {
 }
 
 fn start_emu(cart: Cartridge) {
-    let mut framebuffer = [0; BUFFER_WIDTH * BUFFER_HEIGHT];
+    let mut screen_buffer = [0; SCREEN_WIDTH * SCREEN_HEIGHT];
     let mut window = Window::new("Rustboy",
-                                 BUFFER_WIDTH,
-                                 BUFFER_HEIGHT,
+                                 SCREEN_WIDTH,
+                                 SCREEN_HEIGHT,
                                  WindowOptions {
-                                     scale: Scale::X2,
+                                     scale: Scale::X4,
                                      ..WindowOptions::default()
                                  }).unwrap_or_else(|e| {
         panic!("{}", e);
     });
 
-    for i in framebuffer.iter_mut() {
+    for i in screen_buffer.iter_mut() {
         *i = 0xFFFFFF;
     }
-    window.update_with_buffer(&framebuffer);
+    window.update_with_buffer(&screen_buffer);
 
     let mut cpu = Cpu::new();
     let mut bus = Bus::new(cart);
@@ -92,7 +92,7 @@ fn start_emu(cart: Cartridge) {
 
         let cycles = cpu.step(&mut bus);
         let timer_result = bus.timer.step(cycles);
-        let lcd_result = bus.lcd.step(cycles, &mut framebuffer);
+        let lcd_result = bus.lcd.step(cycles, &mut screen_buffer);
         let joypad_result = bus.joypad.step(&keys);
 
         if timer_result.interrupt {
@@ -109,10 +109,11 @@ fn start_emu(cart: Cartridge) {
 
         if lcd_result.int_vblank {
             cpu.interrupt(&mut bus, Interrupt::VBlank);
-            window.update_with_buffer(&framebuffer);
+            window.update_with_buffer(&screen_buffer);
             frames = frames + 1;
 
             let elapsed = start_time.elapsed();
+
             if elapsed.as_secs() > 0 {
                 window.set_title(format!("Rustboy ({} FPS)", frames).as_str());
                 start_time = Instant::now();
@@ -129,7 +130,7 @@ fn start_emu(cart: Cartridge) {
 }
 
 #[inline(always)]
-fn pressed_keys<'a>(keys: &'a mut Vec<Button>, window: &Window) -> &'a Vec<Button> {
+fn pressed_keys<'a>(keys: &'a mut Vec<Button>, window: &Window) {
     keys.clear();
 
     if window.is_key_down(Key::Enter) {
@@ -163,6 +164,4 @@ fn pressed_keys<'a>(keys: &'a mut Vec<Button>, window: &Window) -> &'a Vec<Butto
     if window.is_key_down(Key::X) {
         keys.push(Button::A);
     }
-
-    keys
 }
