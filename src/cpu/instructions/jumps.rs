@@ -3,7 +3,7 @@ use super::super::{AddressingMode, Condition, Cpu};
 
 // JR
 #[inline(always)]
-pub fn jr(cpu: &mut Cpu, bus: &mut Bus, cond: Condition, src: &AddressingMode<u8>) {
+pub fn jr(cpu: &mut Cpu, bus: &mut Bus, cond: Condition, src: &AddressingMode<u8>) -> bool {
     if cpu.condition_met(cond) {
         let pc = cpu.regs.pc();
         let offset = src.read(cpu, bus) as i8;
@@ -13,37 +13,49 @@ pub fn jr(cpu: &mut Cpu, bus: &mut Bus, cond: Condition, src: &AddressingMode<u8
         } else {
             cpu.regs.set_pc(pc.wrapping_sub(offset.abs() as u16));
         }
+        true
+    } else {
+        false
     }
 }
 
 // JP
 #[inline(always)]
-pub fn jp(cpu: &mut Cpu, bus: &mut Bus, cond: Condition, src: &AddressingMode<u16>) {
+pub fn jp(cpu: &mut Cpu, bus: &mut Bus, cond: Condition, src: &AddressingMode<u16>) -> bool {
     if cpu.condition_met(cond) {
         let addr = src.read(cpu, bus);
         cpu.regs.set_pc(addr);
+        true
+    } else {
+        false
     }
 }
 
 // CALL
 #[inline(always)]
-pub fn call(cpu: &mut Cpu, bus: &mut Bus, cond: Condition, src: &AddressingMode<u16>) {
+pub fn call(cpu: &mut Cpu, bus: &mut Bus, cond: Condition, src: &AddressingMode<u16>) -> bool {
     if cpu.condition_met(cond) {
         let addr = src.read(cpu, bus);
         let pc = cpu.regs.pc();
         
         cpu.push_stack(bus, pc);
         cpu.regs.set_pc(addr);
+        true
+    } else {
+        false
     }
 }
 
 // RET
 #[inline(always)]
-pub fn ret(cpu: &mut Cpu, bus: &mut Bus, cond: Condition) {
+pub fn ret(cpu: &mut Cpu, bus: &mut Bus, cond: Condition) -> bool {
     if cpu.condition_met(cond) {
         let addr = cpu.pop_stack(bus);
 
         cpu.regs.set_pc(addr);
+        true
+    } else {
+        false
     }
 }
 
