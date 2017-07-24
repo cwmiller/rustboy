@@ -258,7 +258,7 @@ impl Lcd {
             let pattern =  self.oam[(idx * 4) + 2];
             let flags = self.oam[(idx * 4) + 3];
 
-            if x >= 8 && y >= 16 && x < 160 && y < 144 {
+            if x >= 8 && y >= 16 {
                 let tile_addr = self.sprite_tile_address(pattern);
                 let screen_x = x.wrapping_sub(8) as usize;
                 let screen_y = y.wrapping_sub(16) as usize;
@@ -266,10 +266,11 @@ impl Lcd {
 
                 for row in 0..8 as usize {
                     for column in 0..8 as usize {
+                        let idx = ((screen_y + row) * SCREEN_WIDTH) + screen_x + column;
                         let shade = self.tile_pixel_shade(tile_addr, row as u8, column as u8);
 
-                        if shade != Shade::White {
-                            screen_buffer[((screen_y + row) * SCREEN_WIDTH) + screen_x + column] = palette.rgb(shade);
+                        if idx < screen_buffer.len() && shade != Shade::White {
+                            screen_buffer[idx] = palette.rgb(shade);
                         }
                     }
                 }
