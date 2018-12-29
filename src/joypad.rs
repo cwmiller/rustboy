@@ -1,13 +1,13 @@
 use bus::Addressable;
 
 bitflags! {
-    flags Pins: u8 {
-        const PIN_15 = 0b10_0000,
-        const PIN_14 = 0b01_0000,
-        const PIN_13 = 0b00_1000,
-        const PIN_12 = 0b00_0100,
-        const PIN_11 = 0b00_0010,
-        const PIN_10 = 0b00_0001
+    struct Pins: u8 {
+        const PIN_15 = 0b10_0000;
+        const PIN_14 = 0b01_0000;
+        const PIN_13 = 0b00_1000;
+        const PIN_12 = 0b00_0100;
+        const PIN_11 = 0b00_0010;
+        const PIN_10 = 0b00_0001;
     }
 }
 
@@ -46,14 +46,14 @@ impl Joypad {
 
         for key in keys.iter() {
             let pins = match *key {
-                Button::Start if self.pins.contains(PIN_15) => PIN_13,
-                Button::Select if self.pins.contains(PIN_15) => PIN_12,
-                Button::Up if self.pins.contains(PIN_14) => PIN_12,
-                Button::Right if self.pins.contains(PIN_14) => PIN_10,
-                Button::Down if self.pins.contains(PIN_14) => PIN_13,
-                Button::Left if self.pins.contains(PIN_14) => PIN_11,
-                Button::A if self.pins.contains(PIN_15) => PIN_10,
-                Button::B if self.pins.contains(PIN_15) => PIN_11,
+                Button::Start if self.pins.contains(Pins::PIN_15) => Pins::PIN_13,
+                Button::Select if self.pins.contains(Pins::PIN_15) => Pins::PIN_12,
+                Button::Up if self.pins.contains(Pins::PIN_14) => Pins::PIN_12,
+                Button::Right if self.pins.contains(Pins::PIN_14) => Pins::PIN_10,
+                Button::Down if self.pins.contains(Pins::PIN_14) => Pins::PIN_13,
+                Button::Left if self.pins.contains(Pins::PIN_14) => Pins::PIN_11,
+                Button::A if self.pins.contains(Pins::PIN_15) => Pins::PIN_10,
+                Button::B if self.pins.contains(Pins::PIN_15) => Pins::PIN_11,
                 _ => Pins::empty()
             };
 
@@ -61,7 +61,7 @@ impl Joypad {
         }
 
         // An interrupt is generated if any pin 10-13 gets triggered
-        for pin in [PIN_10, PIN_11, PIN_12, PIN_13].iter() {
+        for pin in [Pins::PIN_10, Pins::PIN_11, Pins::PIN_12, Pins::PIN_13].iter() {
             if !previous.contains(*pin) && self.pins.contains(*pin) {
                 result.interrupt = true;
             }

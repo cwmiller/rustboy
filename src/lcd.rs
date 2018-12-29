@@ -18,27 +18,27 @@ const ADDR_WY: u16   = 0xFF4A;
 const ADDR_WX: u16   = 0xFF4B;
 
 bitflags! {
-    flags Lcdc: u8 {
-        const LCDC_ENABLED            = 0b1000_0000,
-        const LCDC_WIN_TILE_9C        = 0b0100_0000,
-        const LCDC_WIN_DISPLAY        = 0b0010_0000,
-        const LCDC_UNSIGNED_TILE_DATA = 0b0001_0000,
-        const LCDC_BG_TILE_9C         = 0b0000_1000,
-        const LCDC_16PX_SPRITE        = 0b0000_0100,
-        const LCDC_SPRITE_DISPLAY     = 0b0000_0010,
-        const LCDC_BG_DISPLAY         = 0b0000_0001
+    struct Lcdc: u8 {
+        const LCDC_ENABLED            = 0b1000_0000;
+        const LCDC_WIN_TILE_9C        = 0b0100_0000;
+        const LCDC_WIN_DISPLAY        = 0b0010_0000;
+        const LCDC_UNSIGNED_TILE_DATA = 0b0001_0000;
+        const LCDC_BG_TILE_9C         = 0b0000_1000;
+        const LCDC_16PX_SPRITE        = 0b0000_0100;
+        const LCDC_SPRITE_DISPLAY     = 0b0000_0010;
+        const LCDC_BG_DISPLAY         = 0b0000_0001;
     }
 }
 
 // STAT is mostly flags, but the lower 2 bits are the current mode
 // Mode is will stored separately so the Stat struct is only treated as bitflags.
 bitflags! {
-    flags Stat: u8 {
-        const STAT_COINCIDENCE_INT   = 0b0100_0000,
-        const STAT_OAM_INT           = 0b0010_0000,
-        const STAT_VBLANK_INT        = 0b0001_0000,
-        const STAT_HBLANK_INT        = 0b0000_1000,
-        const STAT_COINCIDENCE_EQUAL = 0b0000_0100
+    struct Stat: u8 {
+        const STAT_COINCIDENCE_INT   = 0b0100_0000;
+        const STAT_OAM_INT           = 0b0010_0000;
+        const STAT_VBLANK_INT        = 0b0001_0000;
+        const STAT_HBLANK_INT        = 0b0000_1000;
+        const STAT_COINCIDENCE_EQUAL = 0b0000_0100;
     }
 }
 
@@ -133,7 +133,7 @@ impl Lcd {
     pub fn step(&mut self, cycles: usize, screen_buffer: &mut [u32]) -> StepResult {
         let mut result = StepResult::default();
 
-        if self.lcdc.contains(LCDC_ENABLED) {
+        if self.lcdc.contains(Lcdc::LCDC_ENABLED) {
             let previous_mode = self.mode;
             self.mode_cycles = self.mode_cycles + cycles;
 
@@ -171,7 +171,7 @@ impl Lcd {
                             self.mode_cycles = 0;
                             result.int_vblank = true;
 
-                            if self.lcdc.contains(LCDC_SPRITE_DISPLAY) {
+                            if self.lcdc.contains(Lcdc::LCDC_SPRITE_DISPLAY) {
                                 self.draw_sprites(screen_buffer);
                             }
                         } else { 
@@ -181,7 +181,7 @@ impl Lcd {
                         self.check_coincidence(&mut result);
                     } else {
                         if self.ly < 144 && self.draw_pending {
-                            if self.lcdc.contains(LCDC_BG_DISPLAY) {
+                            if self.lcdc.contains(Lcdc::LCDC_BG_DISPLAY) {
                                 self.draw_background_line(screen_buffer);
                             }
 
@@ -210,9 +210,9 @@ impl Lcd {
             // If so, an interrupt will be raised if the respective flag is set in the STAT register
             if self.mode != previous_mode {
                 let flag = match self.mode {
-                    Mode::VBlank   => Some(STAT_VBLANK_INT),
-                    Mode::HBlank   => Some(STAT_HBLANK_INT),
-                    Mode::Oam      => Some(STAT_OAM_INT),
+                    Mode::VBlank   => Some(Stat::STAT_VBLANK_INT),
+                    Mode::HBlank   => Some(Stat::STAT_HBLANK_INT),
+                    Mode::Oam      => Some(Stat::STAT_OAM_INT),
                     Mode::Transfer => None
                 };
 
@@ -230,7 +230,7 @@ impl Lcd {
         let map_tile_y = (map_y / 8) as u16;
         let tile_row = map_y & 7;
 
-        let map_addr_base = if self.lcdc.contains(LCDC_BG_TILE_9C) {
+        let map_addr_base = if self.lcdc.contains(Lcdc::LCDC_BG_TILE_9C) {
             0x9C00
         } else {
             0x9800
@@ -291,26 +291,26 @@ impl Lcd {
     }
 
     fn check_coincidence(&mut self, result: &mut StepResult) {
-        if self.stat.contains(STAT_COINCIDENCE_INT) {
+        if self.stat.contains(Stat::STAT_COINCIDENCE_INT) {
             if self.ly == self.lyc {
-                self.stat.insert(STAT_COINCIDENCE_EQUAL);
+                self.stat.insert(Stat::STAT_COINCIDENCE_EQUAL);
                 result.int_stat = true;
             } else {
-                self.stat.remove(STAT_COINCIDENCE_EQUAL);
+                self.stat.remove(Stat::STAT_COINCIDENCE_EQUAL);
             }
         } else {
-            self.stat.remove(STAT_COINCIDENCE_EQUAL);
+            self.stat.remove(Stat::STAT_COINCIDENCE_EQUAL);
         }
     }
 
     fn bg_tile_address(&self, tile_index: u8) -> u16 {
-        let tile_addr_base = if self.lcdc.contains(LCDC_UNSIGNED_TILE_DATA) {
+        let tile_addr_base = if self.lcdc.contains(Lcdc::LCDC_UNSIGNED_TILE_DATA) {
             0x8000
         } else {
             0x9000
         } as u16;
 
-        if self.lcdc.contains(LCDC_UNSIGNED_TILE_DATA) {
+        if self.lcdc.contains(Lcdc::LCDC_UNSIGNED_TILE_DATA) {
             (tile_addr_base + ((tile_index as u16) * 16))
         } else {
             let signed_index = (tile_index as i8) as i16;

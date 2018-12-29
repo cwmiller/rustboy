@@ -30,7 +30,7 @@ impl<'a> Rustboy<'a> {
             *i = 0xFFFFFF;
         }
 
-        self.window.update_with_buffer(&self.screen_buffer);
+        self.window.update_with_buffer(&self.screen_buffer).unwrap();
 
         // Set the CPU to initial values
         self.cpu.reset();
@@ -62,7 +62,7 @@ impl<'a> Rustboy<'a> {
 
             if lcd_result.int_vblank {
                 self.cpu.interrupt(&mut self.bus, Interrupt::VBlank);
-                self.window.update_with_buffer(&self.screen_buffer);
+                self.window.update_with_buffer(&self.screen_buffer).unwrap();
                 ftp_counter_frames += 1;
 
                 let elapsed = fps_counter_time.elapsed();

@@ -3,9 +3,7 @@ extern crate bitflags;
 extern crate byteorder;
 #[macro_use]
 extern crate enum_primitive;
-extern crate fnv;
 extern crate minifb;
-extern crate regex;
 
 mod bus;
 mod cartridge;
