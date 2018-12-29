@@ -51,11 +51,11 @@ impl BankSelection {
 }
 
 enum_from_primitive! {
-#[derive(PartialEq)]
-enum BankMode {
-    Rom = 0,
-    Ram = 1
-}
+    #[derive(PartialEq)]
+    enum BankMode {
+        Rom = 0,
+        Ram = 1
+    }
 }
 
 pub struct Mbc1 {
@@ -68,11 +68,11 @@ pub struct Mbc1 {
 
 impl Mbc1 {
     pub fn new(rom_banks: usize, ram_banks: usize) -> Self {
-        Mbc1 {
+        Self {
             rom_banks: rom_banks,
             ram_banks: ram_banks,
             ram_enabled: false,
-            ram_data: vec![0; (ram_banks * 0x2000)],
+            ram_data: vec![0; ram_banks * 0x2000],
             bank_selection: BankSelection(0)
         }
     }
@@ -142,7 +142,11 @@ impl Mapper for Mbc1 {
                 // Write to RAM Bank
                 if self.ram_enabled {
                     let index = self.ram_index(addr);
-                    self.ram_data[index] = val;
+                    if index >= self.ram_data.len() {
+                        println!("Attempted to write to out-of-bounds MBC1 RAM index {}, addr {:X}.", index, addr);
+                    } else {
+                        self.ram_data[index] = val;
+                    }
                 }
             },
              _ => panic!("Address {:#X} not handled by MBC1")

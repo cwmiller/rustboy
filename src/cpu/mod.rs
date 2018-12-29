@@ -12,7 +12,7 @@ use std::fmt;
 
 pub use self::instructions::{decode, Instruction};
 
-#[derive(PartialEq)]
+#[derive(Copy, Clone, PartialEq)]
 pub enum Condition {
     None,
     Z,
@@ -33,15 +33,21 @@ impl fmt::Display for Condition {
     }
 }
 
-enum_from_primitive! {
-#[derive(Copy, Clone)]
-pub enum Interrupt {
-    Joypad = 0b00010000,
-    Serial = 0b00001000,
-    Timer  = 0b00000100,
-    Stat   = 0b00000010,
-    VBlank = 0b00000001
+struct DecodedInstruction {
+    opcode: u8,
+    prefixed: bool,
+    instruction: Instruction
 }
+
+enum_from_primitive! {
+    #[derive(Copy, Clone)]
+    pub enum Interrupt {
+        Joypad = 0b0001_0000,
+        Serial = 0b0000_1000,
+        Timer  = 0b0000_0100,
+        Stat   = 0b0000_0010,
+        VBlank = 0b0000_0001
+    }
 }
 
 fn interrupt_start_address(interrupt: Interrupt) -> u16 {
@@ -85,10 +91,10 @@ pub struct Cpu {
 
 impl Cpu {
     pub fn new() -> Self {
-        Cpu {
+        Self {
             regs: Registers::default(),
-            halted: false,
-            ime: true
+            ime: true,
+            halted: false
         }
     }
 
@@ -103,65 +109,80 @@ impl Cpu {
     }
 
     pub fn step(&mut self, bus: &mut Bus) -> usize {
+        let mut used_cycles = 0;
         let interrupt = self.pending_interrupt(bus);
 
         // If an interrupt is pending and interrupts are enabled, jump to interrupt
         if interrupt.is_some() && self.ime {
             self.handle_interrupt(bus, interrupt.unwrap());
-
+            
             // It takes 20 cycles to dispatch interrupt, 24 if HALTed.
+            used_cycles += 20;
+
             if self.halted {
                 // Clear HALT.
                 self.halted = false;
-                24
-            } else {
-                20
+                used_cycles += 4;   
             }
         // An an interrupt is pending, interrupts are disabled, and the CPU is halted, then unhalt the CPU
         } else if interrupt.is_some() & !self.ime && self.halted {
             self.halted = false;
-            4
+            used_cycles += 4;
         // CPU is halted and there's no interrupt
         } else if self.halted {
-            1
+            used_cycles += 1;
         // Else execute the next instruction
         } else {
-            let pc = self.regs.pc();
-            let mut opcode = bus.read(pc);
-            let mut length = 1;
-            let mut prefixed = false;
+            let decoded = self.decode_next_instruction(bus);
+            let condition_met = inst::execute(self, bus, &decoded.instruction);
 
-            if opcode == 0xCB {
-                prefixed = true;
-                length = length + 1;
-                opcode = bus.read(pc.wrapping_add(1));
-            }
-
-            let decoded_instruction = {
-                let mut next = || {
-                    let byte = bus.read(pc.wrapping_add(length));
-                    length = length + 1;
-                    byte
-                };
-
-                inst::decode(opcode, prefixed, &mut next)
-            };
-
-            self.regs.set_pc(pc.wrapping_add(length));
-
-            let cycles =
-                if prefixed {
-                    PREFIXED_CYCLES[opcode as usize & 0x0F]
+            let instruction_cycles = 
+                if decoded.prefixed {
+                    PREFIXED_CYCLES[decoded.opcode as usize & 0x0F]
                 } else {
-                    CYCLES[opcode as usize]
+                    CYCLES[decoded.opcode as usize]
                 };
 
-            if decoded_instruction.is_some() && inst::execute(self, bus, decoded_instruction.unwrap()) {
-                cycles.0
-            } else {
-                cycles.1
-            }
+            used_cycles = 
+                if condition_met { 
+                    instruction_cycles.1 
+                } else { 
+                    instruction_cycles.0 
+                }
+        };
+
+        used_cycles
+    }
+
+    fn decode_next_instruction(&mut self, bus: &Bus) -> DecodedInstruction {
+        let mut opcode = self.step_next_byte(bus);
+        let mut prefixed = false;
+
+        if opcode == 0xCB {
+            prefixed = true;
+            opcode = self.step_next_byte(bus);
         }
+
+        DecodedInstruction {
+            opcode: opcode,
+            prefixed: prefixed,
+            instruction: inst::decode(self, bus, opcode, prefixed)
+        }        
+    }
+
+    pub fn step_next_byte(&mut self, bus: &Bus) -> u8 {
+        let pc = self.regs.pc();
+        let byte = bus.read(pc);
+        self.regs.set_pc(pc.wrapping_add(1));
+
+        byte
+    }
+
+    pub fn step_next_word(&mut self, bus: &Bus) -> u16 {
+        let lb = self.step_next_byte(bus);
+        let hb = self.step_next_byte(bus);
+
+        LittleEndian::read_u16(&[lb, hb])
     }
 
     pub fn interrupt(&mut self, bus: &mut Bus, interrupt: Interrupt) {

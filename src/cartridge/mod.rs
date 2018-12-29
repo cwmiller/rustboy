@@ -49,7 +49,7 @@ impl Cartridge {
             None
         };
 
-        Cartridge {
+        Self {
             mapper: mapper,
             rom: data
         }

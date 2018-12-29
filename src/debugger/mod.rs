@@ -1,3 +1,4 @@
+/*
 mod command;
 
 use self::command::Command;
@@ -154,3 +155,4 @@ impl Debugger {
         }
     }
 }
+*/

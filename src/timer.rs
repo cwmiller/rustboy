@@ -7,13 +7,13 @@ const ADDR_TMA: u16  = 0xFF06;
 const ADDR_TAC: u16  = 0xFF07;
 
 enum_from_primitive! {
-#[derive(Copy, Clone)]
-enum TacFrequency {
-    Khz4 = 0,
-    Khz262 = 1,
-    Khz65 = 2,
-    Khz16 = 3
-}
+    #[derive(Copy, Clone)]
+    enum TacFrequency {
+        Khz4 = 0,
+        Khz262 = 1,
+        Khz65 = 2,
+        Khz16 = 3
+    }
 }
 
 impl TacFrequency {
@@ -43,7 +43,7 @@ pub struct Timer {
 
 impl Timer {
     pub fn new() -> Self {
-        Timer {
+        Self {
             div: 0xABCC,
             tima: 0,
             tma: 0,
@@ -86,7 +86,7 @@ impl Addressable for Timer {
             ADDR_DIV => (self.div >> 8) as u8, // Retrieving DIV only returns the MSB,
             ADDR_TIMA => self.tima,
             ADDR_TMA => self.tma,
-            ADDR_TAC => 0b11111000 | ((self.tac_enabled as u8) << 2) | (self.tac_freq as u8),
+            ADDR_TAC => 0b1111_1000 | ((self.tac_enabled as u8) << 2) | (self.tac_freq as u8),
             _ => { println!("Timer read unimplemented ({:#X})", addr); 0 }
         }
     }

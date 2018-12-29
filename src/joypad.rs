@@ -2,12 +2,12 @@ use bus::Addressable;
 
 bitflags! {
     flags Pins: u8 {
-        const PIN_15 = 0b100000,
-        const PIN_14 = 0b010000,
-        const PIN_13 = 0b001000,
-        const PIN_12 = 0b000100,
-        const PIN_11 = 0b000010,
-        const PIN_10 = 0b000001
+        const PIN_15 = 0b10_0000,
+        const PIN_14 = 0b01_0000,
+        const PIN_13 = 0b00_1000,
+        const PIN_12 = 0b00_0100,
+        const PIN_11 = 0b00_0010,
+        const PIN_10 = 0b00_0001
     }
 }
 
@@ -33,7 +33,7 @@ pub struct Joypad {
 
 impl Joypad {
     pub fn new() -> Self {
-        Joypad {
+        Self {
             pins: Pins::empty()
         }
     }

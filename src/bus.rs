@@ -61,7 +61,7 @@ struct Ram {
 
 impl Ram {
     fn new(start_addr: u16, size: usize) -> Self {
-        Ram {
+        Self {
             start_addr: start_addr,
             data: vec![0; size]
         }
@@ -78,8 +78,8 @@ impl Addressable for Ram {
     }
 }
 
-pub struct Bus {
-    cartridge: Cartridge,
+pub struct Bus<'a> {
+    cartridge: &'a mut Cartridge,
     io_ie: u8,
     io_if: u8,
     high_ram: Ram,
@@ -91,9 +91,9 @@ pub struct Bus {
     work_ram: Ram,
 }
 
-impl Bus {
-    pub fn new(cart: Cartridge) -> Self {
-        Bus {
+impl<'a> Bus<'a> {
+    pub fn new(cart: &'a mut Cartridge) -> Self {
+        Self {
             cartridge: cart,
             io_ie: 0,
             io_if: 0,
@@ -108,7 +108,7 @@ impl Bus {
     }
 }
 
-impl Addressable for Bus {
+impl<'a> Addressable for Bus<'a> {
     fn read(&self, addr: u16) -> u8 {
         match addr {
             // 0x0000 - 0x7FFF Cartridge ROM

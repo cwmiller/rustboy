@@ -43,23 +43,23 @@ bitflags! {
 }
 
 enum_from_primitive! {
-#[derive(Copy, Clone, PartialEq)]
-pub enum Mode {
-    VBlank   = 0,
-    HBlank   = 1,
-    Oam      = 2,
-    Transfer = 3
-}
+    #[derive(Copy, Clone, PartialEq)]
+    pub enum Mode {
+        VBlank   = 0,
+        HBlank   = 1,
+        Oam      = 2,
+        Transfer = 3
+    }
 }
 
 enum_from_primitive! {
-#[derive(Copy, Clone, PartialEq)]
-enum Shade {
-    White       = 0,
-    LightGray   = 1,
-    DarkGray    = 2,
-    Black       = 3
-}
+    #[derive(Copy, Clone, PartialEq)]
+    enum Shade {
+        White       = 0,
+        LightGray   = 1,
+        DarkGray    = 2,
+        Black       = 3
+    }
 }
 
 const CYCLES_PER_OAM_READ: usize = 80;
@@ -109,7 +109,7 @@ pub struct Lcd {
 
 impl Lcd {
     pub fn new() -> Self {
-        Lcd {
+        Self {
             vram: [0; (VIDEO_RAM_END - VIDEO_RAM_START) as usize + 1],
             oam: [0; (OAM_END - OAM_START) as usize + 1],
             lcdc: Lcdc::from_bits(0x91).unwrap(),
@@ -130,7 +130,7 @@ impl Lcd {
         }
     }
 
-    pub fn step(&mut self, cycles: usize, mut screen_buffer: &mut [u32]) -> StepResult {
+    pub fn step(&mut self, cycles: usize, screen_buffer: &mut [u32]) -> StepResult {
         let mut result = StepResult::default();
 
         if self.lcdc.contains(LCDC_ENABLED) {

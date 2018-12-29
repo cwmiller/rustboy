@@ -1,6 +1,6 @@
 use std::fmt;
 
-#[allow(dead_code)]
+#[derive(Copy, Clone)]
 pub enum Register {
     A,
     B,
@@ -39,10 +39,10 @@ impl fmt::Display for Register {
     }
 }
 
-pub const FLAG_Z: u8 = 0b10000000;
-pub const FLAG_N: u8 = 0b01000000;
-pub const FLAG_H: u8 = 0b00100000;
-pub const FLAG_C: u8 = 0b00010000;
+pub const FLAG_Z: u8 = 0b1000_0000;
+pub const FLAG_N: u8 = 0b0100_0000;
+pub const FLAG_H: u8 = 0b0010_0000;
+pub const FLAG_C: u8 = 0b0001_0000;
 
 #[derive(Default)]
 pub struct Registers {
