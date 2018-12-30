@@ -9,7 +9,8 @@ use cartridge::Cartridge;
 #[test]
 fn jr_addr() {
     let mut cpu = Cpu::new();
-    let mut bus = Bus::new(Cartridge::from_vec(vec![0; 65536]));
+    let mut cartridge = Cartridge::from_vec(vec![0; 65536]);
+    let mut bus = Bus::new(&mut cartridge);
     let addr = ImmediateAddressing(0xF);
 
     cpu.regs.set_pc(0xFF0);
@@ -22,7 +23,8 @@ fn jr_addr() {
 #[test]
 fn jr_wrapping() {
     let mut cpu = Cpu::new();
-    let mut bus = Bus::new(Cartridge::from_vec(vec![0; 65536]));
+    let mut cartridge = Cartridge::from_vec(vec![0; 65536]);
+    let mut bus = Bus::new(&mut cartridge);
     let addr = ImmediateAddressing(10);
 
     cpu.regs.set_pc(0xFFFF);
@@ -37,7 +39,8 @@ fn jr_wrapping() {
 #[test]
 fn jp_addr() {
     let mut cpu = Cpu::new();
-    let mut bus = Bus::new(Cartridge::from_vec(vec![0; 65536]));
+    let mut cartridge = Cartridge::from_vec(vec![0; 65536]);
+    let mut bus = Bus::new(&mut cartridge);
     let addr = ImmediateAddressing(0xFFFF);
 
     cpu.regs.set_pc(0);
@@ -52,7 +55,8 @@ fn jp_addr() {
 #[test]
 fn call_addr() {
     let mut cpu = Cpu::new();
-    let mut bus = Bus::new(Cartridge::from_vec(vec![0; 65536]));
+    let mut cartridge = Cartridge::from_vec(vec![0; 65536]);
+    let mut bus = Bus::new(&mut cartridge);
     let addr = ImmediateAddressing(0xFFFF);
 
     cpu.regs.set_pc(0xFF);
@@ -68,7 +72,8 @@ fn call_addr() {
 #[test]
 fn ret_after_call() {
     let mut cpu = Cpu::new();
-    let mut bus = Bus::new(Cartridge::from_vec(vec![0; 65536]));
+    let mut cartridge = Cartridge::from_vec(vec![0; 65536]);
+    let mut bus = Bus::new(&mut cartridge);
     let addr = ImmediateAddressing(0xFFFF);
 
     cpu.regs.set_pc(0xFF);
@@ -84,7 +89,8 @@ fn ret_after_call() {
 #[test]
 fn reti_after_call() {
     let mut cpu = Cpu::new();
-    let mut bus = Bus::new(Cartridge::from_vec(vec![0; 65536]));
+    let mut cartridge = Cartridge::from_vec(vec![0; 65536]);
+    let mut bus = Bus::new(&mut cartridge);
     let addr = ImmediateAddressing(0xFFFF);
 
     cpu.regs.set_pc(0xFF);
@@ -101,7 +107,8 @@ fn reti_after_call() {
 #[test]
 fn rst_10h() {
     let mut cpu = Cpu::new();
-    let mut bus = Bus::new(Cartridge::from_vec(vec![0; 65536]));
+    let mut cartridge = Cartridge::from_vec(vec![0; 65536]);
+    let mut bus = Bus::new(&mut cartridge);
 
     cpu.regs.set_pc(0xFF);
 

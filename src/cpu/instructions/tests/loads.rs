@@ -9,7 +9,8 @@ use cartridge::Cartridge;
 #[test]
 fn ld_a_b() {
     let mut cpu = Cpu::new();
-    let mut bus = Bus::new(Cartridge::from_vec(vec![0; 65536]));
+    let mut cartridge = Cartridge::from_vec(vec![0; 65536]);
+    let mut bus = Bus::new(&mut cartridge);
     let a = RegisterAddressing(Register::A);
     let b = RegisterAddressing(Register::B);
 
@@ -26,7 +27,8 @@ fn ld_a_b() {
 #[test]
 fn ldhl_carry() {
     let mut cpu = Cpu::new();
-    let mut bus = Bus::new(Cartridge::from_vec(vec![0; 65536]));
+    let mut cartridge = Cartridge::from_vec(vec![0; 65536]);
+    let mut bus = Bus::new(&mut cartridge);
     let reg = RegisterAddressing(Register::A);
 
     cpu.regs.set_f(0b1111);
@@ -42,7 +44,8 @@ fn ldhl_carry() {
 #[test]
 fn ldhl_half_carry() {
     let mut cpu = Cpu::new();
-    let mut bus = Bus::new(Cartridge::from_vec(vec![0; 65536]));
+    let mut cartridge = Cartridge::from_vec(vec![0; 65536]);
+    let mut bus = Bus::new(&mut cartridge);
     let reg = RegisterAddressing(Register::A);
 
     cpu.regs.set_f(0b1111);
@@ -60,7 +63,8 @@ fn ldhl_half_carry() {
 #[test]
 fn ldd_a_hl() {
     let mut cpu = Cpu::new();
-    let mut bus = Bus::new(Cartridge::from_vec(vec![0; 65536]));
+    let mut cartridge = Cartridge::from_vec(vec![0; 65536]);
+    let mut bus = Bus::new(&mut cartridge);
     let a = RegisterAddressing(Register::A);
     let hl = RegisterIndirectAddressing(Register::HL);
 
@@ -79,7 +83,8 @@ fn ldd_a_hl() {
 #[test]
 fn ldi_a_hl() {
     let mut cpu = Cpu::new();
-    let mut bus = Bus::new(Cartridge::from_vec(vec![0; 65536]));
+    let mut cartridge = Cartridge::from_vec(vec![0; 65536]);
+    let mut bus = Bus::new(&mut cartridge);
     let a = RegisterAddressing(Register::A);
     let hl = RegisterIndirectAddressing(Register::HL);
 
@@ -98,7 +103,8 @@ fn ldi_a_hl() {
 #[test]
 fn push_to_stack() {
     let mut cpu = Cpu::new();
-    let mut bus = Bus::new(Cartridge::from_vec(vec![0; 65536]));
+    let mut cartridge = Cartridge::from_vec(vec![0; 65536]);
+    let mut bus = Bus::new(&mut cartridge);
     let bc = RegisterAddressing(Register::BC);
 
     cpu.regs.set_sp(0xFFF0);
@@ -116,7 +122,8 @@ fn push_to_stack() {
 #[test]
 fn pop_from_stack() {
     let mut cpu = Cpu::new();
-    let mut bus = Bus::new(Cartridge::from_vec(vec![0; 65536]));
+    let mut cartridge = Cartridge::from_vec(vec![0; 65536]);
+    let mut bus = Bus::new(&mut cartridge);
     let bc = RegisterAddressing(Register::BC);
 
     cpu.push_stack(&mut bus, 0xBBCC);

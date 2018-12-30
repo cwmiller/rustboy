@@ -10,7 +10,8 @@ use cartridge::Cartridge;
 #[test]
 fn add8_no_flags() {
     let mut cpu = Cpu::new();
-    let mut bus = Bus::new(Cartridge::from_vec(vec![0; 65536]));
+    let mut cartridge = Cartridge::from_vec(vec![0; 65536]);
+    let mut bus = Bus::new(&mut cartridge);
     let inc = ImmediateAddressing(0xDE);
 
     cpu.regs.set_f(0b1111 << 4);
@@ -25,7 +26,8 @@ fn add8_no_flags() {
 #[test]
 fn add8_carry() {
     let mut cpu = Cpu::new();
-    let mut bus = Bus::new(Cartridge::from_vec(vec![0; 65536]));
+    let mut cartridge = Cartridge::from_vec(vec![0; 65536]);
+    let mut bus = Bus::new(&mut cartridge);
     let inc = ImmediateAddressing(0xF0);
 
     cpu.regs.set_f(0b1111 << 4);
@@ -40,7 +42,8 @@ fn add8_carry() {
 #[test]
 fn add8_half_carry() {
     let mut cpu = Cpu::new();
-    let mut bus = Bus::new(Cartridge::from_vec(vec![0; 65536]));
+    let mut cartridge = Cartridge::from_vec(vec![0; 65536]);
+    let mut bus = Bus::new(&mut cartridge);
     let inc = ImmediateAddressing(0x0F);
 
     cpu.regs.set_f(0b1111 << 4);
@@ -55,7 +58,8 @@ fn add8_half_carry() {
 #[test]
 fn add8_zero() {
     let mut cpu = Cpu::new();
-    let mut bus = Bus::new(Cartridge::from_vec(vec![0; 65536]));
+    let mut cartridge = Cartridge::from_vec(vec![0; 65536]);
+    let mut bus = Bus::new(&mut cartridge);
     let inc = ImmediateAddressing(0xFF);
 
     cpu.regs.set_f(0b1111 << 4);
@@ -72,7 +76,8 @@ fn add8_zero() {
 #[test]
 fn add16_no_flags() {
     let mut cpu = Cpu::new();
-    let mut bus = Bus::new(Cartridge::from_vec(vec![0; 65536]));
+    let mut cartridge = Cartridge::from_vec(vec![0; 65536]);
+    let mut bus = Bus::new(&mut cartridge);
     let dest = RegisterAddressing(Register::HL);
     let inc = ImmediateAddressing(0x01);
 
@@ -88,7 +93,8 @@ fn add16_no_flags() {
 #[test]
 fn add16_carry_flag() {
     let mut cpu = Cpu::new();
-    let mut bus = Bus::new(Cartridge::from_vec(vec![0; 65536]));
+    let mut cartridge = Cartridge::from_vec(vec![0; 65536]);
+    let mut bus = Bus::new(&mut cartridge);
     let dest = RegisterAddressing(Register::HL);
     let inc = ImmediateAddressing(0xEEEE);
 
@@ -104,7 +110,8 @@ fn add16_carry_flag() {
 #[test]
 fn add16_half_carry_flag() {
     let mut cpu = Cpu::new();
-    let mut bus = Bus::new(Cartridge::from_vec(vec![0; 65536]));
+    let mut cartridge = Cartridge::from_vec(vec![0; 65536]);
+    let mut bus = Bus::new(&mut cartridge);
     let dest = RegisterAddressing(Register::HL);
     let inc = ImmediateAddressing(0xBBB);
 
@@ -122,7 +129,8 @@ fn add16_half_carry_flag() {
 #[test]
 fn add_sp_carry_flag() {
     let mut cpu = Cpu::new();
-    let mut bus = Bus::new(Cartridge::from_vec(vec![0; 65536]));
+    let mut cartridge = Cartridge::from_vec(vec![0; 65536]);
+    let mut bus = Bus::new(&mut cartridge);
     let inc = ImmediateAddressing(0x10);
 
     cpu.regs.set_f(0b1111 << 4);
@@ -137,7 +145,8 @@ fn add_sp_carry_flag() {
 #[test]
 fn add_sp_half_carry_flag() {
     let mut cpu = Cpu::new();
-    let mut bus = Bus::new(Cartridge::from_vec(vec![0; 65536]));
+    let mut cartridge = Cartridge::from_vec(vec![0; 65536]);
+    let mut bus = Bus::new(&mut cartridge);
     let inc = ImmediateAddressing(0xF);
 
     cpu.regs.set_f(0b1111 << 4);
@@ -154,7 +163,8 @@ fn add_sp_half_carry_flag() {
 #[test]
 fn adc_no_carry_no_flags() {
     let mut cpu = Cpu::new();
-    let mut bus = Bus::new(Cartridge::from_vec(vec![0; 65536]));
+    let mut cartridge = Cartridge::from_vec(vec![0; 65536]);
+    let mut bus = Bus::new(&mut cartridge);
     let n = ImmediateAddressing(0x12);
 
     cpu.regs.set_a(0x34);
@@ -169,7 +179,8 @@ fn adc_no_carry_no_flags() {
 #[test]
 fn adc_no_carry_does_carry() {
     let mut cpu = Cpu::new();
-    let mut bus = Bus::new(Cartridge::from_vec(vec![0; 65536]));
+    let mut cartridge = Cartridge::from_vec(vec![0; 65536]);
+    let mut bus = Bus::new(&mut cartridge);
     let n = ImmediateAddressing(0xFE);
 
     cpu.regs.set_a(0x10);
@@ -184,7 +195,8 @@ fn adc_no_carry_does_carry() {
 #[test]
 fn adc_with_carry_does_carry() {
     let mut cpu = Cpu::new();
-    let mut bus = Bus::new(Cartridge::from_vec(vec![0; 65536]));
+    let mut cartridge = Cartridge::from_vec(vec![0; 65536]);
+    let mut bus = Bus::new(&mut cartridge);
     let n = ImmediateAddressing(0xFE);
 
     cpu.regs.set_a(0x10);
@@ -199,7 +211,8 @@ fn adc_with_carry_does_carry() {
 #[test]
 fn adc_half_carry() {
     let mut cpu = Cpu::new();
-    let mut bus = Bus::new(Cartridge::from_vec(vec![0; 65536]));
+    let mut cartridge = Cartridge::from_vec(vec![0; 65536]);
+    let mut bus = Bus::new(&mut cartridge);
     let n = ImmediateAddressing(0x0F);
 
     cpu.regs.set_a(0x01);
@@ -214,7 +227,8 @@ fn adc_half_carry() {
 #[test]
 fn adc_zero() {
     let mut cpu = Cpu::new();
-    let mut bus = Bus::new(Cartridge::from_vec(vec![0; 65536]));
+    let mut cartridge = Cartridge::from_vec(vec![0; 65536]);
+    let mut bus = Bus::new(&mut cartridge);
     let n = ImmediateAddressing(0);
 
     cpu.regs.set_a(0xFF);
@@ -231,7 +245,8 @@ fn adc_zero() {
 #[test]
 fn sub_doesnt_borrow() {
     let mut cpu = Cpu::new();
-    let mut bus = Bus::new(Cartridge::from_vec(vec![0; 65536]));
+    let mut cartridge = Cartridge::from_vec(vec![0; 65536]);
+    let mut bus = Bus::new(&mut cartridge);
     let n = ImmediateAddressing(0x05);
 
     cpu.regs.set_a(0xFF);
@@ -246,7 +261,8 @@ fn sub_doesnt_borrow() {
 #[test]
 fn sub_does_borrow() {
     let mut cpu = Cpu::new();
-    let mut bus = Bus::new(Cartridge::from_vec(vec![0; 65536]));
+    let mut cartridge = Cartridge::from_vec(vec![0; 65536]);
+    let mut bus = Bus::new(&mut cartridge);
     let n = ImmediateAddressing(0xB0);
 
     cpu.regs.set_a(0xAA);
@@ -261,7 +277,8 @@ fn sub_does_borrow() {
 #[test]
 fn sub_half_borrow() {
     let mut cpu = Cpu::new();
-    let mut bus = Bus::new(Cartridge::from_vec(vec![0; 65536]));
+    let mut cartridge = Cartridge::from_vec(vec![0; 65536]);
+    let mut bus = Bus::new(&mut cartridge);
     let n = ImmediateAddressing(0x0F);
 
     cpu.regs.set_a(0xAA);
@@ -278,7 +295,8 @@ fn sub_half_borrow() {
 #[test]
 fn sbc_no_carry_no_flags() {
     let mut cpu = Cpu::new();
-    let mut bus = Bus::new(Cartridge::from_vec(vec![0; 65536]));
+    let mut cartridge = Cartridge::from_vec(vec![0; 65536]);
+    let mut bus = Bus::new(&mut cartridge);
     let n = ImmediateAddressing(0x12);
 
     cpu.regs.set_a(0x34);
@@ -293,7 +311,8 @@ fn sbc_no_carry_no_flags() {
 #[test]
 fn sbc_no_carry_does_carry() {
     let mut cpu = Cpu::new();
-    let mut bus = Bus::new(Cartridge::from_vec(vec![0; 65536]));
+    let mut cartridge = Cartridge::from_vec(vec![0; 65536]);
+    let mut bus = Bus::new(&mut cartridge);
     let n = ImmediateAddressing(0x20);
 
     cpu.regs.set_a(0x10);
@@ -308,7 +327,8 @@ fn sbc_no_carry_does_carry() {
 #[test]
 fn sbc_with_carry_does_carry() {
     let mut cpu = Cpu::new();
-    let mut bus = Bus::new(Cartridge::from_vec(vec![0; 65536]));
+    let mut cartridge = Cartridge::from_vec(vec![0; 65536]);
+    let mut bus = Bus::new(&mut cartridge);
     let n = ImmediateAddressing(0x20);
 
     cpu.regs.set_a(0x10);
@@ -323,7 +343,8 @@ fn sbc_with_carry_does_carry() {
 #[test]
 fn sbc_half_carry() {
     let mut cpu = Cpu::new();
-    let mut bus = Bus::new(Cartridge::from_vec(vec![0; 65536]));
+    let mut cartridge = Cartridge::from_vec(vec![0; 65536]);
+    let mut bus = Bus::new(&mut cartridge);
     let n = ImmediateAddressing(0x03);
 
     cpu.regs.set_a(0x31);
@@ -338,7 +359,8 @@ fn sbc_half_carry() {
 #[test]
 fn sbc_zero() {
     let mut cpu = Cpu::new();
-    let mut bus = Bus::new(Cartridge::from_vec(vec![0; 65536]));
+    let mut cartridge = Cartridge::from_vec(vec![0; 65536]);
+    let mut bus = Bus::new(&mut cartridge);
     let n = ImmediateAddressing(1);
 
     cpu.regs.set_a(2);
@@ -355,7 +377,8 @@ fn sbc_zero() {
 #[test]
 fn and_not_zero() {
     let mut cpu = Cpu::new();
-    let mut bus = Bus::new(Cartridge::from_vec(vec![0; 65536]));
+    let mut cartridge = Cartridge::from_vec(vec![0; 65536]);
+    let mut bus = Bus::new(&mut cartridge);
     let n = ImmediateAddressing(0xBE);
 
     cpu.regs.set_a(0xEF);
@@ -370,7 +393,8 @@ fn and_not_zero() {
 #[test]
 fn and_zero() {
     let mut cpu = Cpu::new();
-    let mut bus = Bus::new(Cartridge::from_vec(vec![0; 65536]));
+    let mut cartridge = Cartridge::from_vec(vec![0; 65536]);
+    let mut bus = Bus::new(&mut cartridge);
     let n = ImmediateAddressing(0xF0);
 
     cpu.regs.set_a(0x0F);
@@ -387,7 +411,8 @@ fn and_zero() {
 #[test]
 fn xor_not_zero() {
     let mut cpu = Cpu::new();
-    let mut bus = Bus::new(Cartridge::from_vec(vec![0; 65536]));
+    let mut cartridge = Cartridge::from_vec(vec![0; 65536]);
+    let mut bus = Bus::new(&mut cartridge);
     let n = ImmediateAddressing(0xBE);
 
     cpu.regs.set_a(0xEF);
@@ -402,7 +427,8 @@ fn xor_not_zero() {
 #[test]
 fn xor_zero() {
     let mut cpu = Cpu::new();
-    let mut bus = Bus::new(Cartridge::from_vec(vec![0; 65536]));
+    let mut cartridge = Cartridge::from_vec(vec![0; 65536]);
+    let mut bus = Bus::new(&mut cartridge);
     let n = ImmediateAddressing(0x42);
 
     cpu.regs.set_a(0x42);
@@ -419,7 +445,8 @@ fn xor_zero() {
 #[test]
 fn or_not_zero() {
     let mut cpu = Cpu::new();
-    let mut bus = Bus::new(Cartridge::from_vec(vec![0; 65536]));
+    let mut cartridge = Cartridge::from_vec(vec![0; 65536]);
+    let mut bus = Bus::new(&mut cartridge);
     let n = ImmediateAddressing(0x45);
 
     cpu.regs.set_a(0x10);
@@ -434,7 +461,8 @@ fn or_not_zero() {
 #[test]
 fn or_zero() {
     let mut cpu = Cpu::new();
-    let mut bus = Bus::new(Cartridge::from_vec(vec![0; 65536]));
+    let mut cartridge = Cartridge::from_vec(vec![0; 65536]);
+    let mut bus = Bus::new(&mut cartridge);
     let n = ImmediateAddressing(0);
 
     cpu.regs.set_a(0);
@@ -451,7 +479,8 @@ fn or_zero() {
 #[test]
 fn cp_doesnt_borrow() {
     let mut cpu = Cpu::new();
-    let mut bus = Bus::new(Cartridge::from_vec(vec![0; 65536]));
+    let mut cartridge = Cartridge::from_vec(vec![0; 65536]);
+    let mut bus = Bus::new(&mut cartridge);
     let n = ImmediateAddressing(0x05);
 
     cpu.regs.set_a(0xFF);
@@ -466,7 +495,8 @@ fn cp_doesnt_borrow() {
 #[test]
 fn cp_does_borrow() {
     let mut cpu = Cpu::new();
-    let mut bus = Bus::new(Cartridge::from_vec(vec![0; 65536]));
+    let mut cartridge = Cartridge::from_vec(vec![0; 65536]);
+    let mut bus = Bus::new(&mut cartridge);
     let n = ImmediateAddressing(0xB0);
 
     cpu.regs.set_a(0xAA);
@@ -481,7 +511,8 @@ fn cp_does_borrow() {
 #[test]
 fn cp_half_borrow() {
     let mut cpu = Cpu::new();
-    let mut bus = Bus::new(Cartridge::from_vec(vec![0; 65536]));
+    let mut cartridge = Cartridge::from_vec(vec![0; 65536]);
+    let mut bus = Bus::new(&mut cartridge);
     let n = ImmediateAddressing(0x0F);
 
     cpu.regs.set_a(0xAA);
@@ -498,7 +529,8 @@ fn cp_half_borrow() {
 #[test]
 fn inc8_no_half_carry() {
     let mut cpu = Cpu::new();
-    let mut bus = Bus::new(Cartridge::from_vec(vec![0; 65536]));
+    let mut cartridge = Cartridge::from_vec(vec![0; 65536]);
+    let mut bus = Bus::new(&mut cartridge);
     let a = RegisterAddressing(Register::A);
 
     cpu.regs.set_a(0xDE);
@@ -513,7 +545,8 @@ fn inc8_no_half_carry() {
 #[test]
 fn inc8_half_carry() {
     let mut cpu = Cpu::new();
-    let mut bus = Bus::new(Cartridge::from_vec(vec![0; 65536]));
+    let mut cartridge = Cartridge::from_vec(vec![0; 65536]);
+    let mut bus = Bus::new(&mut cartridge);
     let a = RegisterAddressing(Register::A);
 
     cpu.regs.set_a(0xDF);
@@ -528,7 +561,8 @@ fn inc8_half_carry() {
 #[test]
 fn inc8_zero() {
     let mut cpu = Cpu::new();
-    let mut bus = Bus::new(Cartridge::from_vec(vec![0; 65536]));
+    let mut cartridge = Cartridge::from_vec(vec![0; 65536]);
+    let mut bus = Bus::new(&mut cartridge);
     let a = RegisterAddressing(Register::A);
 
     cpu.regs.set_a(0xFF);
@@ -545,7 +579,8 @@ fn inc8_zero() {
 #[test]
 fn dec8_no_half_carry() {
     let mut cpu = Cpu::new();
-    let mut bus = Bus::new(Cartridge::from_vec(vec![0; 65536]));
+    let mut cartridge = Cartridge::from_vec(vec![0; 65536]);
+    let mut bus = Bus::new(&mut cartridge);
     let a = RegisterAddressing(Register::A);
 
     cpu.regs.set_a(0xDE);
@@ -560,7 +595,8 @@ fn dec8_no_half_carry() {
 #[test]
 fn dec8_half_carry() {
     let mut cpu = Cpu::new();
-    let mut bus = Bus::new(Cartridge::from_vec(vec![0; 65536]));
+    let mut cartridge = Cartridge::from_vec(vec![0; 65536]);
+    let mut bus = Bus::new(&mut cartridge);
     let a = RegisterAddressing(Register::A);
 
     cpu.regs.set_a(0xD0);
@@ -575,7 +611,8 @@ fn dec8_half_carry() {
 #[test]
 fn dec8_zero() {
     let mut cpu = Cpu::new();
-    let mut bus = Bus::new(Cartridge::from_vec(vec![0; 65536]));
+    let mut cartridge = Cartridge::from_vec(vec![0; 65536]);
+    let mut bus = Bus::new(&mut cartridge);
     let a = RegisterAddressing(Register::A);
 
     cpu.regs.set_a(0x01);
@@ -592,7 +629,8 @@ fn dec8_zero() {
 #[test]
 fn inc16() {
     let mut cpu = Cpu::new();
-    let mut bus = Bus::new(Cartridge::from_vec(vec![0; 65536]));
+    let mut cartridge = Cartridge::from_vec(vec![0; 65536]);
+    let mut bus = Bus::new(&mut cartridge);
     let bc = RegisterAddressing(Register::BC);
 
     cpu.regs.set_bc(0xBEEF);
@@ -609,7 +647,8 @@ fn inc16() {
 #[test]
 fn dec16() {
     let mut cpu = Cpu::new();
-    let mut bus = Bus::new(Cartridge::from_vec(vec![0; 65536]));
+    let mut cartridge = Cartridge::from_vec(vec![0; 65536]);
+    let mut bus = Bus::new(&mut cartridge);
     let bc = RegisterAddressing(Register::BC);
 
     cpu.regs.set_bc(0xBEEF);
@@ -626,7 +665,8 @@ fn dec16() {
 #[test]
 fn daa() {
     let mut cpu = Cpu::new();
-    let mut bus = Bus::new(Cartridge::from_vec(vec![0; 65536]));
+    let mut cartridge = Cartridge::from_vec(vec![0; 65536]);
+    let mut bus = Bus::new(&mut cartridge);
     let b = RegisterAddressing(Register::B);
 
     cpu.regs.set_a(0x49);
