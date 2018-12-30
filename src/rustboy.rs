@@ -37,43 +37,54 @@ impl<'a> Rustboy<'a> {
 
         // FPS counter variables
         let mut fps_counter_time = Instant::now();
-        let mut ftp_counter_frames = 0;
-
-        // A vector containing the keys pressed during a step
-        let mut keys = Vec::new();
+        let mut fps_counter_frames = 0;
 
         while self.window.is_open() && !self.window.is_key_down(Key::Escape) {
-            let cycles = self.cpu.step(&mut self.bus);
-            let timer_result = self.bus.timer.step(cycles);
-            let lcd_result = self.bus.lcd.step(cycles, &mut self.screen_buffer);
-            let joypad_result = self.bus.joypad.step(&keys);
+            let buttons = get_button_presses(&self.window);
 
+            // Execute the next CPU instruction. The number of cycles used is returned.
+            let cycles = self.cpu.step(&mut self.bus);
+
+            // Step timer
+            let timer_result = self.bus.timer.step(cycles);
+
+            // Step LCD
+            let lcd_result = self.bus.lcd.step(cycles, &mut self.screen_buffer);
+
+            // Step joypad
+            let joypad_result = self.bus.joypad.step(buttons);
+
+            // The timer interrupts when the counter reaches its goal
             if timer_result.interrupt {
                 self.cpu.interrupt(&mut self.bus, Interrupt::Timer);
             }
 
+            // LCD can generate a STAT interrupt when modes change or when the cursor reaches a specific line
             if lcd_result.int_stat {
                 self.cpu.interrupt(&mut self.bus, Interrupt::Stat);
             }
 
+            // Joypad interrupts when a button is pressed
             if joypad_result.interrupt {
                 self.cpu.interrupt(&mut self.bus, Interrupt::Joypad);
             }
 
+            // LCD interrupts when VLANK is reached
+            // We'll use this time to update the framebuffer, record any key presses for the next frame, and update the FPS counter
             if lcd_result.int_vblank {
                 self.cpu.interrupt(&mut self.bus, Interrupt::VBlank);
                 self.window.update_with_buffer(&self.screen_buffer).unwrap();
-                ftp_counter_frames += 1;
 
+                fps_counter_frames += 1;
+
+                // If a second has passed, update the FPS counter
                 let elapsed = fps_counter_time.elapsed();
 
                 if elapsed.as_secs() > 0 {
-                    self.window.set_title(format!("Rustboy ({} FPS)", ftp_counter_frames).as_str());
+                    self.window.set_title(format!("Rustboy ({} FPS)", fps_counter_frames).as_str());
                     fps_counter_time = Instant::now();
-                    ftp_counter_frames = 0;
+                    fps_counter_frames = 0;
                 }
-
-                get_key_presses(&mut keys, &self.window);
             }
         }
     }
@@ -93,38 +104,40 @@ fn create_window(scale: Scale) -> Window {
 }
 
 #[inline(always)]
-fn get_key_presses<'a>(keys: &'a mut Vec<Button>, window: &Window) {
-    keys.clear();
+fn get_button_presses(window: &Window) -> Button {
+    let mut buttons: Button = Button::empty();
 
     if window.is_key_down(Key::Enter) {
-        keys.push(Button::Start);
+        buttons |= Button::START;
     }
 
     if window.is_key_down(Key::RightShift) || window.is_key_down(Key::LeftShift) {
-        keys.push(Button::Select);
+        buttons |= Button::SELECT;
     }
 
     if window.is_key_down(Key::Up) {
-        keys.push(Button::Up);
+        buttons |= Button::UP;
     }
 
     if window.is_key_down(Key::Right) {
-        keys.push(Button::Right);
+        buttons |= Button::RIGHT;
     }
 
     if window.is_key_down(Key::Down) {
-        keys.push(Button::Down);
+        buttons |= Button::DOWN;
     }
 
     if window.is_key_down(Key::Left) {
-        keys.push(Button::Left);
+        buttons |= Button::LEFT;
     }
 
     if window.is_key_down(Key::Z) {
-        keys.push(Button::B);
+        buttons |= Button::B;
     }
 
     if window.is_key_down(Key::X) {
-        keys.push(Button::A);
+        buttons |= Button::A;
     }
+
+    buttons
 }

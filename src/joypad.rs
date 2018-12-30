@@ -1,7 +1,7 @@
 use bus::Addressable;
 
 bitflags! {
-    struct Pins: u8 {
+    struct Pin: u8 {
         const PIN_15 = 0b10_0000;
         const PIN_14 = 0b01_0000;
         const PIN_13 = 0b00_1000;
@@ -16,52 +16,75 @@ pub struct StepResult {
     pub interrupt: bool
 }
 
-pub enum Button {
-    Start,
-    Select,
-    Up,
-    Right,
-    Down,
-    Left,
-    A,
-    B
+
+bitflags! {
+    pub struct Button: u8 {
+        const START     = 0b1000_0000;
+        const SELECT    = 0b0100_0000;
+        const UP        = 0b0010_0000;
+        const RIGHT     = 0b0001_0000;
+        const DOWN      = 0b0000_1000;
+        const LEFT      = 0b0000_0100;
+        const A         = 0b0000_0010;
+        const B         = 0b0000_0001;
+    }
 }
 
 pub struct Joypad {
-    pins: Pins
+    pins: Pin
 }
 
 impl Joypad {
     pub fn new() -> Self {
         Self {
-            pins: Pins::empty()
+            pins: Pin::empty()
         }
     }
 
-    pub fn step(&mut self, keys: &Vec<Button>) -> StepResult {
+    pub fn step(&mut self, buttons: Button) -> StepResult {
         let mut result = StepResult::default();
         let previous = self.pins;
 
         self.pins.bits = previous.bits & 0b11_0000;
 
-        for key in keys.iter() {
-            let pins = match *key {
-                Button::Start if self.pins.contains(Pins::PIN_15) => Pins::PIN_13,
-                Button::Select if self.pins.contains(Pins::PIN_15) => Pins::PIN_12,
-                Button::Up if self.pins.contains(Pins::PIN_14) => Pins::PIN_12,
-                Button::Right if self.pins.contains(Pins::PIN_14) => Pins::PIN_10,
-                Button::Down if self.pins.contains(Pins::PIN_14) => Pins::PIN_13,
-                Button::Left if self.pins.contains(Pins::PIN_14) => Pins::PIN_11,
-                Button::A if self.pins.contains(Pins::PIN_15) => Pins::PIN_10,
-                Button::B if self.pins.contains(Pins::PIN_15) => Pins::PIN_11,
-                _ => Pins::empty()
-            };
+        // The GB uses a 2x4 matrix for detecting button presses.
+        // It sets PIN_14 when reading the dpad and PIN_15 when reading the other buttons.
+        if self.pins.contains(Pin::PIN_14) {
+            if buttons.contains(Button::UP) {
+                self.pins |= Pin::PIN_12;
+            }
 
-            self.pins.bits = self.pins.bits | pins.bits;
+            if buttons.contains(Button::RIGHT) {
+                self.pins |= Pin::PIN_10;
+            }
+
+            if buttons.contains(Button::DOWN) {
+                self.pins |= Pin::PIN_13;
+            }
+
+            if buttons.contains(Button::LEFT) {
+                self.pins |= Pin::PIN_11;
+            }
+        } else if self.pins.contains(Pin::PIN_15) {
+            if buttons.contains(Button::START) {
+                self.pins |= Pin::PIN_13;
+            }
+
+            if buttons.contains(Button::SELECT) {
+                self.pins |= Pin::PIN_12;
+            }
+
+            if buttons.contains(Button::A) {
+                self.pins |= Pin::PIN_10;
+            }
+
+            if buttons.contains(Button::B) {
+                self.pins |= Pin::PIN_11;
+            }
         }
 
         // An interrupt is generated if any pin 10-13 gets triggered
-        for pin in [Pins::PIN_10, Pins::PIN_11, Pins::PIN_12, Pins::PIN_13].iter() {
+        for pin in [Pin::PIN_10, Pin::PIN_11, Pin::PIN_12, Pin::PIN_13].iter() {
             if !previous.contains(*pin) && self.pins.contains(*pin) {
                 result.interrupt = true;
             }
@@ -78,6 +101,7 @@ impl Addressable for Joypad {
     }
 
     fn write(&mut self, _: u16, val: u8) {
-        self.pins.bits = !val & 0b11_1111;
+        // Only allow bits 5 and 4 to be written to
+        self.pins.bits = (!val & 0b11_0000) | (self.pins.bits & 0b00_1111)
     }
 }
