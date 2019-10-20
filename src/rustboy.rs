@@ -30,7 +30,7 @@ impl<'a> Rustboy<'a> {
             *i = 0xFFFFFF;
         }
 
-        self.window.update_with_buffer(&self.screen_buffer).unwrap();
+        self.window.update_with_buffer(&self.screen_buffer).expect("Unable to render window");
 
         // Set the CPU to initial values
         self.cpu.reset();
@@ -98,9 +98,7 @@ fn create_window(scale: Scale) -> Window {
         WindowOptions {
             scale: scale,
             ..WindowOptions::default()
-        }).unwrap_or_else(|e| {
-            panic!("{}", e);
-        })
+        }).expect("Unable to create window")
 }
 
 #[inline(always)]

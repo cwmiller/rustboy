@@ -27,7 +27,7 @@ fn main() {
         let bin_arg = env::args().nth(0).unwrap();
         let bin_path = Path::new(bin_arg.as_str());
 
-        println!("Usage: {} [ROM]", bin_path.file_name().unwrap().to_str().unwrap());
+        eprintln!("Usage: {} [ROM]", bin_path.file_name().unwrap().to_str().unwrap());
         process::exit(1);
     }
 
@@ -35,7 +35,7 @@ fn main() {
     let rom_path = Path::new(rom_arg.as_str());
 
     if !rom_path.is_file() {
-        println!("File {} does not exist.", rom_arg);
+        eprintln!("File {} does not exist.", rom_arg);
         process::exit(1);
     }
 
