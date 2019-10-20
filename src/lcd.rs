@@ -10,7 +10,6 @@ const ADDR_SCY: u16  = 0xFF42;
 const ADDR_SCX: u16  = 0xFF43;
 const ADDR_LY: u16   = 0xFF44;
 const ADDR_LYC: u16  = 0xFF45;
-pub const ADDR_DMA: u16  = 0xFF46;
 const ADDR_BGP: u16  = 0xFF47;
 const ADDR_OBP0: u16 = 0xFF48;
 const ADDR_OBP1: u16 = 0xFF49;
@@ -101,7 +100,6 @@ pub struct Lcd {
     obp1: Palette,
     wy: u8,
     wx: u8,
-    dma: u8,
     mode: Mode,
     mode_cycles: usize,
     draw_pending: bool
@@ -123,7 +121,6 @@ impl Lcd {
             obp1: Palette(0xFF),
             wy: 0,
             wx: 0,
-            dma: 0,
             mode: Mode::Oam,
             mode_cycles: 0,
             draw_pending: false
@@ -326,15 +323,14 @@ impl Lcd {
 impl Addressable for Lcd {
     fn read(&self, addr: u16) -> u8 {
         match addr {
-            VIDEO_RAM_START...VIDEO_RAM_END => self.vram[(addr - VIDEO_RAM_START) as usize],
-            OAM_START...OAM_END => self.oam[(addr - OAM_START) as usize],
+            VIDEO_RAM_START..=VIDEO_RAM_END => self.vram[(addr - VIDEO_RAM_START) as usize],
+            OAM_START..=OAM_END => self.oam[(addr - OAM_START) as usize],
             ADDR_LCDC => self.lcdc.bits,
             ADDR_STAT => 0b1000_0000 | ((self.stat.bits & 0b1111_1100) | (self.mode as u8)),
             ADDR_SCY => self.scy,
             ADDR_SCX => self.scx,
             ADDR_LY => self.ly,
             ADDR_LYC => self.lyc,
-            ADDR_DMA => self.dma,
             ADDR_BGP => self.bgp.0,
             ADDR_OBP0 => self.obp0.0,
             ADDR_OBP1 => self.obp1.0,
@@ -346,8 +342,8 @@ impl Addressable for Lcd {
 
     fn write(&mut self, addr: u16, val: u8) {
         match addr {
-            VIDEO_RAM_START...VIDEO_RAM_END => self.vram[(addr - VIDEO_RAM_START) as usize] = val,
-            OAM_START...OAM_END => self.oam[(addr - OAM_START) as usize] = val,
+            VIDEO_RAM_START..=VIDEO_RAM_END => self.vram[(addr - VIDEO_RAM_START) as usize] = val,
+            OAM_START..=OAM_END => self.oam[(addr - OAM_START) as usize] = val,
             ADDR_LCDC => self.lcdc.bits = val,
             ADDR_STAT => {
                 self.stat.bits = val & 0b1111_1100;
@@ -357,7 +353,6 @@ impl Addressable for Lcd {
             ADDR_SCX => self.scx = val,
             ADDR_LY => (), // read-only
             ADDR_LYC => self.lyc = val,
-            ADDR_DMA => { self.dma = val }, // Actual transfer is done by the Bus object
             ADDR_BGP => self.bgp = Palette(val),
             ADDR_OBP0 => self.obp0 = Palette(val),
             ADDR_OBP1 => self.obp1 = Palette(val),

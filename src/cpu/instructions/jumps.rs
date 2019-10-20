@@ -3,7 +3,7 @@ use super::super::{AddressingMode, Condition, Cpu};
 
 // JR
 #[inline(always)]
-pub fn jr(cpu: &mut Cpu, bus: &mut Bus, cond: Condition, src: &AddressingMode<u8>) -> bool {
+pub fn jr(cpu: &mut Cpu, bus: &mut Bus, cond: Condition, src: &dyn AddressingMode<u8>) -> bool {
     if cpu.condition_met(cond) {
         let pc = cpu.regs.pc();
         let offset = src.read(cpu, bus) as i8;
@@ -21,7 +21,7 @@ pub fn jr(cpu: &mut Cpu, bus: &mut Bus, cond: Condition, src: &AddressingMode<u8
 
 // JP
 #[inline(always)]
-pub fn jp(cpu: &mut Cpu, bus: &mut Bus, cond: Condition, src: &AddressingMode<u16>) -> bool {
+pub fn jp(cpu: &mut Cpu, bus: &mut Bus, cond: Condition, src: &dyn AddressingMode<u16>) -> bool {
     if cpu.condition_met(cond) {
         let addr = src.read(cpu, bus);
         cpu.regs.set_pc(addr);
@@ -33,7 +33,7 @@ pub fn jp(cpu: &mut Cpu, bus: &mut Bus, cond: Condition, src: &AddressingMode<u1
 
 // CALL
 #[inline(always)]
-pub fn call(cpu: &mut Cpu, bus: &mut Bus, cond: Condition, src: &AddressingMode<u16>) -> bool {
+pub fn call(cpu: &mut Cpu, bus: &mut Bus, cond: Condition, src: &dyn AddressingMode<u16>) -> bool {
     if cpu.condition_met(cond) {
         let addr = src.read(cpu, bus);
         let pc = cpu.regs.pc();

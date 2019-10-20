@@ -3,7 +3,7 @@ use super::super::{AddressingMode, Cpu};
 
 // LD
 #[inline(always)]
-pub fn ld<T>(cpu: &mut Cpu, bus: &mut Bus, dest: &AddressingMode<T>, src: &AddressingMode<T>) {
+pub fn ld<T>(cpu: &mut Cpu, bus: &mut Bus, dest: &dyn AddressingMode<T>, src: &dyn AddressingMode<T>) {
     let val = src.read(cpu, bus);
     dest.write(cpu, bus, val);
 }
@@ -11,7 +11,7 @@ pub fn ld<T>(cpu: &mut Cpu, bus: &mut Bus, dest: &AddressingMode<T>, src: &Addre
 // LDHL SP, r8
 // Affects flags: Z, N, H, C
 #[inline(always)]
-pub fn ldhl(cpu: &mut Cpu, bus: &mut Bus, src: &AddressingMode<u8>) {
+pub fn ldhl(cpu: &mut Cpu, bus: &mut Bus, src: &dyn AddressingMode<u8>) {
     let sp = cpu.regs.sp();
     let unsigned = src.read(cpu, bus) as u16;
     let signed = src.read(cpu, bus) as i8;
@@ -30,7 +30,7 @@ pub fn ldhl(cpu: &mut Cpu, bus: &mut Bus, src: &AddressingMode<u8>) {
 
 // LDD
 #[inline(always)]
-pub fn ldd(cpu: &mut Cpu, bus: &mut Bus, dest: &AddressingMode<u8>, src: &AddressingMode<u8>) {
+pub fn ldd(cpu: &mut Cpu, bus: &mut Bus, dest: &dyn AddressingMode<u8>, src: &dyn AddressingMode<u8>) {
     let val = src.read(cpu, bus);
     let hl = cpu.regs.hl();
 
@@ -40,7 +40,7 @@ pub fn ldd(cpu: &mut Cpu, bus: &mut Bus, dest: &AddressingMode<u8>, src: &Addres
 
 // LDI
 #[inline(always)]
-pub fn ldi(cpu: &mut Cpu, bus: &mut Bus, dest: &AddressingMode<u8>, src: &AddressingMode<u8>) {
+pub fn ldi(cpu: &mut Cpu, bus: &mut Bus, dest: &dyn AddressingMode<u8>, src: &dyn AddressingMode<u8>) {
     let val = src.read(cpu, bus);
     let hl = cpu.regs.hl();
 
@@ -50,14 +50,14 @@ pub fn ldi(cpu: &mut Cpu, bus: &mut Bus, dest: &AddressingMode<u8>, src: &Addres
 
 // PUSH
 #[inline(always)]
-pub fn push(cpu: &mut Cpu, bus: &mut Bus, src: &AddressingMode<u16>) {
+pub fn push(cpu: &mut Cpu, bus: &mut Bus, src: &dyn AddressingMode<u16>) {
     let val = src.read(cpu, bus);
     cpu.push_stack(bus, val);
 }
 
 // POP
 #[inline(always)]
-pub fn pop(cpu: &mut Cpu, bus: &mut Bus, dest: &AddressingMode<u16>) {
+pub fn pop(cpu: &mut Cpu, bus: &mut Bus, dest: &dyn AddressingMode<u16>) {
     let val = cpu.pop_stack(bus);
     dest.write(cpu, bus, val);
 }

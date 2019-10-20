@@ -99,15 +99,15 @@ impl Mbc1 {
 impl Mapper for Mbc1 {
     fn read(&self, rom: &Vec<u8>, addr: u16) -> u8 {
         match addr {
-            0x0000...0x3FFF => {
+            0x0000..=0x3FFF => {
                 // ROM bank 0
                 rom[addr as usize]
             },
-            0x4000...0x7FFF => {
+            0x4000..=0x7FFF => {
                 // Switchable ROM bank
                 rom[self.rom_index(addr)]
             },
-            0xA000...0xBFFF => {
+            0xA000..=0xBFFF => {
                 // Switchable RAM bank
                 if self.ram_enabled {
                     self.ram_data[self.ram_index(addr)]
@@ -121,24 +121,24 @@ impl Mapper for Mbc1 {
 
     fn write(&mut self, addr: u16, val: u8) {
         match addr {
-            0x0000...0x1FFF => {
+            0x0000..=0x1FFF => {
                 // Writing to this space toggles RAM
                 // Any value with A in the lower bits enables it
                 self.ram_enabled = (val & 0x0A) == 0x0A;
             },
-            0x2000...0x3FFF => {
+            0x2000..=0x3FFF => {
                 // Writing to this space switches ROM bank lower bits
                 self.bank_selection.set_lower(val);
             },
-            0x4000...0x5FFF => {
+            0x4000..=0x5FFF => {
                 // Writing to this space switches the ROM bank upper bits/RAM bank
                 self.bank_selection.set_upper(val);
             },
-            0x6000...0x7FFF => {
+            0x6000..=0x7FFF => {
                 // Writing to this space toggles RAM/ROM bank mode. 1 = RAM mode
                 self.bank_selection.set_mode(BankMode::from_u8(val & 1).unwrap_or_else(|| panic!("Unknown bank mode: {:#X}", val)));
             },
-            0xA000...0xBFFF => {
+            0xA000..=0xBFFF => {
                 // Write to RAM Bank
                 if self.ram_enabled {
                     let index = self.ram_index(addr);

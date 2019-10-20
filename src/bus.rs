@@ -1,6 +1,6 @@
 use cartridge::Cartridge;
 use joypad::Joypad;
-use lcd::{Lcd, ADDR_DMA};
+use lcd::Lcd;
 use serial::Serial;
 use sound::Sound;
 use timer::Timer;
@@ -37,6 +37,8 @@ const IO_TIMER_END: u16 = 0xFF07;
 
 const IO_VIDEO_START: u16 = 0xFF40;
 const IO_VIDEO_END: u16 = 0xFF4B;
+
+const DMA_ADDR: u16 = 0xFF46;
 
 pub const IO_IF_ADDR: u16 = 0xFF0F;
 
@@ -106,39 +108,48 @@ impl<'a> Bus<'a> {
             work_ram: Ram::new(WORK_RAM_START, WORK_RAM_SIZE)
         }
     }
+
+    fn dma_transfer(&mut self, high_byte: u8) {
+        for low_byte in 0..0xA0 {
+            let src_val = self.read(((high_byte as u16) << 8) | low_byte);
+            self.write(0xFE00 | low_byte, src_val);
+        }
+    }
 }
 
 impl<'a> Addressable for Bus<'a> {
     fn read(&self, addr: u16) -> u8 {
         match addr {
             // 0x0000 - 0x7FFF Cartridge ROM
-            CARTRIDGE_ROM_START...CARTRIDGE_ROM_END => self.cartridge.read(addr),
+            CARTRIDGE_ROM_START..=CARTRIDGE_ROM_END => self.cartridge.read(addr),
             // 0x8000 - 0x9FFF Video ROM
-            VIDEO_RAM_START...VIDEO_RAM_END => self.lcd.read(addr),
+            VIDEO_RAM_START..=VIDEO_RAM_END => self.lcd.read(addr),
             // 0xA000 - 0xBFFF RAM bank
-            SWITCHABLE_RAM_START...SWITCHABLE_RAM_END => self.cartridge.read(addr),
+            SWITCHABLE_RAM_START..=SWITCHABLE_RAM_END => self.cartridge.read(addr),
             // 0xC000 - 0xDFFF Work RAM
-            WORK_RAM_START...WORK_RAM_END => self.work_ram.read(addr),
+            WORK_RAM_START..=WORK_RAM_END => self.work_ram.read(addr),
             // 0xE000 - 0xFDFF Echo of Work RAM
-            ECHO_RAM_START...ECHO_RAM_END => self.work_ram.read(addr - 0x2000),
+            ECHO_RAM_START..=ECHO_RAM_END => self.work_ram.read(addr - 0x2000),
             // 0xFE00 - 0xFE9F Sprite OAM
-            OAM_START...OAM_END => self.lcd.read(addr),
+            OAM_START..=OAM_END => self.lcd.read(addr),
             // 0xFEA0 - 0xFEFF UNUSED
-            UNUSED_START...UNUSED_END => 0,
+            UNUSED_START..=UNUSED_END => 0,
             // 0xFF00 Joypad
             IO_JOYPAD => self.joypad.read(addr),
             // 0xFF01 - 0xFF02 Serial IO ports
-            IO_SERIAL_START...IO_SERIAL_END => self.serial.read(addr),
+            IO_SERIAL_START..=IO_SERIAL_END => self.serial.read(addr),
             // 0xFF04 - 0xFF07 Timer IO ports
-            IO_TIMER_START...IO_TIMER_END => self.timer.read(addr),
-            // 0xFF40 - 0xFE9F Video IO ports
-            IO_VIDEO_START...IO_VIDEO_END => self.lcd.read(addr),
+            IO_TIMER_START..=IO_TIMER_END => self.timer.read(addr),
+            // 0xFF40 - 0xFE9F Video IO ports (omit DMA)
+            IO_VIDEO_START..=IO_VIDEO_END if addr != DMA_ADDR => self.lcd.read(addr),
+            // 0xFF46 DMA
+            DMA_ADDR => 1,
             // 0xFF0F IF IO port
             IO_IF_ADDR => self.io_if | 0b11100000,
             // 0xFF10 - 0xFF3F Sound IO ports
-            IO_SOUND_START...IO_SOUND_END => self.sound.read(addr),
+            IO_SOUND_START..=IO_SOUND_END => self.sound.read(addr),
             // 0xFF80 - 0xFFFE High RAM
-            HIGH_RAM_START...HIGH_RAM_END => self.high_ram.read(addr),
+            HIGH_RAM_START..=HIGH_RAM_END => self.high_ram.read(addr),
             // 0xFFFF IE IO port
             IO_IE_ADDR => self.io_ie,
             _ => { println!("Unimplemented read ({:#X})", addr); 0xFF }
@@ -148,43 +159,35 @@ impl<'a> Addressable for Bus<'a> {
     fn write(&mut self, addr: u16, val: u8) {
         match addr {
             // 0x0000 - 0x7FFF Cartridge ROM
-            CARTRIDGE_ROM_START...CARTRIDGE_ROM_END => self.cartridge.write(addr, val),
+            CARTRIDGE_ROM_START..=CARTRIDGE_ROM_END => self.cartridge.write(addr, val),
             // 0x8000 - 0x9FFF Video ROM
-            VIDEO_RAM_START...VIDEO_RAM_END => self.lcd.write(addr, val),
+            VIDEO_RAM_START..=VIDEO_RAM_END => self.lcd.write(addr, val),
             // 0xA000 - 0xBFFF RAM bank
-            SWITCHABLE_RAM_START...SWITCHABLE_RAM_END => self.cartridge.write(addr, val),
+            SWITCHABLE_RAM_START..=SWITCHABLE_RAM_END => self.cartridge.write(addr, val),
             // 0xC000 - 0xDFFF Work RAM
-            WORK_RAM_START...WORK_RAM_END => self.work_ram.write(addr, val),
+            WORK_RAM_START..=WORK_RAM_END => self.work_ram.write(addr, val),
             // 0xE000 - 0xFDFF Echo of Work RAM
-            ECHO_RAM_START...ECHO_RAM_END => self.work_ram.write(addr - 0x2000, val),
+            ECHO_RAM_START..=ECHO_RAM_END => self.work_ram.write(addr - 0x2000, val),
             // 0xFE00 - 0xFE9F Sprite OAM
-            OAM_START...OAM_END => self.lcd.write(addr, val),
+            OAM_START..=OAM_END => self.lcd.write(addr, val),
             // 0xFEA0 - 0xFEFF UNUSED
-            UNUSED_START...UNUSED_END => { },
+            UNUSED_START..=UNUSED_END => { },
             // 0xFF00 Joypad
             IO_JOYPAD => self.joypad.write(addr, val),
             // 0xFF01 - 0xFF02 Serial IO ports
-            IO_SERIAL_START...IO_SERIAL_END => self.serial.write(addr, val),
+            IO_SERIAL_START..=IO_SERIAL_END => self.serial.write(addr, val),
             // 0xFF04 - 0xFF07 Timer IO ports
-            IO_TIMER_START...IO_TIMER_END => self.timer.write(addr, val),
-            // 0xFF40 - 0xFE9F Video IO ports
-            IO_VIDEO_START...IO_VIDEO_END => {
-                if addr == ADDR_DMA {
-                    for lsb in 0..0xA0 {
-                        let src_val = self.read(((val as u16) << 8) | lsb);
-                        self.write(0xFE00 | lsb, src_val);
-                    }
-                    self.lcd.write(addr, val);
-                } else {
-                    self.lcd.write(addr, val);
-                }
-            },
+            IO_TIMER_START..=IO_TIMER_END => self.timer.write(addr, val),
+            // 0xFF40 - 0xFE9F Video IO ports (omit DMA)
+            IO_VIDEO_START..=IO_VIDEO_END if addr != DMA_ADDR => self.lcd.write(addr, val),
+            // 0xFF46 DMA 
+            DMA_ADDR => self.dma_transfer(val),
             // 0xFF0F IF IO port
             IO_IF_ADDR => self.io_if = val & 0b11111,
             // 0xFF10 - 0xFF3F Sound IO ports
-            IO_SOUND_START...IO_SOUND_END => self.sound.write(addr, val),
+            IO_SOUND_START..=IO_SOUND_END => self.sound.write(addr, val),
             // 0xFF80 - 0xFFFE High RAM
-            HIGH_RAM_START...HIGH_RAM_END => self.high_ram.write(addr, val),
+            HIGH_RAM_START..=HIGH_RAM_END => self.high_ram.write(addr, val),
             // 0xFFFF IE IO port
             IO_IE_ADDR => self.io_ie = val,
             _ => println!("Unimplemented write ({:#X} -> {:#X})", val, addr)

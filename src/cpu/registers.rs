@@ -1,6 +1,7 @@
 use std::fmt;
 
 #[derive(Copy, Clone)]
+#[allow(dead_code)]
 pub enum Register {
     A,
     B,

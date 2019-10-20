@@ -4,7 +4,7 @@ use super::super::{AddressingMode, Cpu};
 // ADD (8bit)
 // Flags affected: Z, N, H, C
 #[inline(always)]
-pub fn add_8(cpu: &mut Cpu, bus: &mut Bus, src: &AddressingMode<u8>) {
+pub fn add_8(cpu: &mut Cpu, bus: &mut Bus, src: &dyn AddressingMode<u8>) {
     let val = cpu.regs.a();
     let inc = src.read(cpu, bus);
     let sum = val.wrapping_add(inc);
@@ -19,7 +19,7 @@ pub fn add_8(cpu: &mut Cpu, bus: &mut Bus, src: &AddressingMode<u8>) {
 // ADD (16bit)
 // Affects flags: N, H, C
 #[inline(always)]
-pub fn add_16(cpu: &mut Cpu, bus: &mut Bus, dest: &AddressingMode<u16>, src: &AddressingMode<u16>) {
+pub fn add_16(cpu: &mut Cpu, bus: &mut Bus, dest: &dyn AddressingMode<u16>, src: &dyn AddressingMode<u16>) {
     let src_val = src.read(cpu, bus);
     let dest_val = dest.read(cpu, bus);
 
@@ -33,7 +33,7 @@ pub fn add_16(cpu: &mut Cpu, bus: &mut Bus, dest: &AddressingMode<u16>, src: &Ad
 // ADD SP, r8
 // Affects flags: Z, N, H, C
 #[inline(always)]
-pub fn add_sp(cpu: &mut Cpu, bus: &mut Bus, src: &AddressingMode<u8>) {
+pub fn add_sp(cpu: &mut Cpu, bus: &mut Bus, src: &dyn AddressingMode<u8>) {
     let sp = cpu.regs.sp();
     let signed = src.read(cpu, bus) as i8;
     let unsigned = src.read(cpu, bus) as u16;
@@ -53,7 +53,7 @@ pub fn add_sp(cpu: &mut Cpu, bus: &mut Bus, src: &AddressingMode<u8>) {
 // ADC
 // Flags affected: Z, N, H, C
 #[inline(always)]
-pub fn adc(cpu: &mut Cpu, bus: &mut Bus, src: &AddressingMode<u8>) {
+pub fn adc(cpu: &mut Cpu, bus: &mut Bus, src: &dyn AddressingMode<u8>) {
     let val = cpu.regs.a() as u32;
     let inc = src.read(cpu, bus) as u32;
     let carry = cpu.regs.carry() as u32;
@@ -69,7 +69,7 @@ pub fn adc(cpu: &mut Cpu, bus: &mut Bus, src: &AddressingMode<u8>) {
 // SUB
 // Flags affected: Z, N, H, C
 #[inline(always)]
-pub fn sub(cpu: &mut Cpu, bus: &mut Bus, src: &AddressingMode<u8>) {
+pub fn sub(cpu: &mut Cpu, bus: &mut Bus, src: &dyn AddressingMode<u8>) {
     let val = cpu.regs.a();
     let dec = src.read(cpu, bus);
     let diff = val.wrapping_sub(dec);
@@ -84,7 +84,7 @@ pub fn sub(cpu: &mut Cpu, bus: &mut Bus, src: &AddressingMode<u8>) {
 // SBC
 // Flags affected: Z, N, H, C
 #[inline(always)]
-pub fn sbc(cpu: &mut Cpu, bus: &mut Bus, src: &AddressingMode<u8>) {
+pub fn sbc(cpu: &mut Cpu, bus: &mut Bus, src: &dyn AddressingMode<u8>) {
     let val = cpu.regs.a() as u32;
     let dec = src.read(cpu, bus) as u32;
     let carry = cpu.regs.carry() as u32;
@@ -101,7 +101,7 @@ pub fn sbc(cpu: &mut Cpu, bus: &mut Bus, src: &AddressingMode<u8>) {
 // AND
 // Flags affected: Z, N, H, C
 #[inline(always)]
-pub fn and(cpu: &mut Cpu, bus: &mut Bus, src: &AddressingMode<u8>) {
+pub fn and(cpu: &mut Cpu, bus: &mut Bus, src: &dyn AddressingMode<u8>) {
     let existing = cpu.regs.a();
     let val = src.read(cpu, bus);
     let res = existing & val;
@@ -116,7 +116,7 @@ pub fn and(cpu: &mut Cpu, bus: &mut Bus, src: &AddressingMode<u8>) {
 // XOR
 // Flags affected: Z, N, H, C
 #[inline(always)]
-pub fn xor(cpu: &mut Cpu, bus: &mut Bus, src: &AddressingMode<u8>) {
+pub fn xor(cpu: &mut Cpu, bus: &mut Bus, src: &dyn AddressingMode<u8>) {
     let existing = cpu.regs.a();
     let val = src.read(cpu, bus);
     let res = existing ^ val;
@@ -131,7 +131,7 @@ pub fn xor(cpu: &mut Cpu, bus: &mut Bus, src: &AddressingMode<u8>) {
 // OR
 // Flags affected: Z, N, H, C
 #[inline(always)]
-pub fn or(cpu: &mut Cpu, bus: &mut Bus, src: &AddressingMode<u8>) {
+pub fn or(cpu: &mut Cpu, bus: &mut Bus, src: &dyn AddressingMode<u8>) {
     let existing = cpu.regs.a();
     let val = src.read(cpu, bus);
     let res = existing | val;
@@ -146,7 +146,7 @@ pub fn or(cpu: &mut Cpu, bus: &mut Bus, src: &AddressingMode<u8>) {
 // CP
 // Flags affected: Z, N, H, C
 #[inline(always)]
-pub fn cp(cpu: &mut Cpu, bus: &mut Bus, src: &AddressingMode<u8>) {
+pub fn cp(cpu: &mut Cpu, bus: &mut Bus, src: &dyn AddressingMode<u8>) {
     let val = cpu.regs.a();
     let dec = src.read(cpu, bus);
     let diff = val.wrapping_sub(dec);
@@ -160,7 +160,7 @@ pub fn cp(cpu: &mut Cpu, bus: &mut Bus, src: &AddressingMode<u8>) {
 // INC (8bit)
 // Affects flags: Z, N, H
 #[inline(always)]
-pub fn inc_8(cpu: &mut Cpu, bus: &mut Bus, dest: &AddressingMode<u8>) {
+pub fn inc_8(cpu: &mut Cpu, bus: &mut Bus, dest: &dyn AddressingMode<u8>) {
     let val = dest.read(cpu, bus);
     let increased = val.wrapping_add(1);
 
@@ -173,7 +173,7 @@ pub fn inc_8(cpu: &mut Cpu, bus: &mut Bus, dest: &AddressingMode<u8>) {
 // DEC (8bit)
 // Affects flags: Z, N, H
 #[inline(always)]
-pub fn dec_8(cpu: &mut Cpu, bus: &mut Bus, dest: &AddressingMode<u8>) {
+pub fn dec_8(cpu: &mut Cpu, bus: &mut Bus, dest: &dyn AddressingMode<u8>) {
     let val = dest.read(cpu, bus);
     let decreased = val.wrapping_sub(1);
 
@@ -185,14 +185,14 @@ pub fn dec_8(cpu: &mut Cpu, bus: &mut Bus, dest: &AddressingMode<u8>) {
 
 // INC (16bit)
 #[inline(always)]
-pub fn inc_16(cpu: &mut Cpu, bus: &mut Bus, dest: &AddressingMode<u16>) {
+pub fn inc_16(cpu: &mut Cpu, bus: &mut Bus, dest: &dyn AddressingMode<u16>) {
     let val = dest.read(cpu, bus);
     dest.write(cpu, bus, val.wrapping_add(1));
 }
 
 // DEC (16bit)
 #[inline(always)]
-pub fn dec_16(cpu: &mut Cpu, bus: &mut Bus, dest: &AddressingMode<u16>) {
+pub fn dec_16(cpu: &mut Cpu, bus: &mut Bus, dest: &dyn AddressingMode<u16>) {
     let val = dest.read(cpu, bus);
     dest.write(cpu, bus, val.wrapping_sub(1));
 }

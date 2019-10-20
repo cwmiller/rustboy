@@ -21,15 +21,15 @@ use super::registers::Register;
 
 pub enum Instruction {
     Nop,
-    Ld8(Box<AddressingMode<u8>>, Box<AddressingMode<u8>>),
-    Ld16(Box<AddressingMode<u16>>, Box<AddressingMode<u16>>),
+    Ld8(Box<dyn AddressingMode<u8>>, Box<dyn AddressingMode<u8>>),
+    Ld16(Box<dyn AddressingMode<u16>>, Box<dyn AddressingMode<u16>>),
     Stop,
-    Jr(Condition, Box<AddressingMode<u8>>),
-    Add16(Box<AddressingMode<u16>>,Box<AddressingMode<u16>>),
-    Inc8(Box<AddressingMode<u8>>),
-    Inc16(Box<AddressingMode<u16>>),
-    Dec8(Box<AddressingMode<u8>>),
-    Dec16(Box<AddressingMode<u16>>),
+    Jr(Condition, Box<dyn AddressingMode<u8>>),
+    Add16(Box<dyn AddressingMode<u16>>,Box<dyn AddressingMode<u16>>),
+    Inc8(Box<dyn AddressingMode<u8>>),
+    Inc16(Box<dyn AddressingMode<u16>>),
+    Dec8(Box<dyn AddressingMode<u8>>),
+    Dec16(Box<dyn AddressingMode<u16>>),
     Rlca,
     Rrca,
     Rla,
@@ -38,40 +38,40 @@ pub enum Instruction {
     Cpl,
     Scf,
     Ccf,
-    Ldd(Box<AddressingMode<u8>>, Box<AddressingMode<u8>>),
-    Ldi(Box<AddressingMode<u8>>, Box<AddressingMode<u8>>),
-    Add8(Box<AddressingMode<u8>>),       
-    Adc(Box<AddressingMode<u8>>),
-    Sub(Box<AddressingMode<u8>>),  
-    Sbc(Box<AddressingMode<u8>>),
-    And(Box<AddressingMode<u8>>),
-    Xor(Box<AddressingMode<u8>>),
-    Or(Box<AddressingMode<u8>>),
-    Cp(Box<AddressingMode<u8>>),
+    Ldd(Box<dyn AddressingMode<u8>>, Box<dyn AddressingMode<u8>>),
+    Ldi(Box<dyn AddressingMode<u8>>, Box<dyn AddressingMode<u8>>),
+    Add8(Box<dyn AddressingMode<u8>>),       
+    Adc(Box<dyn AddressingMode<u8>>),
+    Sub(Box<dyn AddressingMode<u8>>),  
+    Sbc(Box<dyn AddressingMode<u8>>),
+    And(Box<dyn AddressingMode<u8>>),
+    Xor(Box<dyn AddressingMode<u8>>),
+    Or(Box<dyn AddressingMode<u8>>),
+    Cp(Box<dyn AddressingMode<u8>>),
     Halt,
     Ret(Condition),
-    AddSp(Box<AddressingMode<u8>>),
-    Ldh(Box<AddressingMode<u8>>,Box<AddressingMode<u8>>),
-    Ldhl(Box<AddressingMode<u8>>),
-    Pop(Box<AddressingMode<u16>>),
+    AddSp(Box<dyn AddressingMode<u8>>),
+    Ldh(Box<dyn AddressingMode<u8>>,Box<dyn AddressingMode<u8>>),
+    Ldhl(Box<dyn AddressingMode<u8>>),
+    Pop(Box<dyn AddressingMode<u16>>),
     Reti,
-    Jp(Condition, Box<AddressingMode<u16>>),
+    Jp(Condition, Box<dyn AddressingMode<u16>>),
     Di,
     Ei,
-    Call(Condition, Box<AddressingMode<u16>>),
-    Push(Box<AddressingMode<u16>>),
+    Call(Condition, Box<dyn AddressingMode<u16>>),
+    Push(Box<dyn AddressingMode<u16>>),
     Rst(u8),
-    Rlc(Box<AddressingMode<u8>>),
-    Rrc(Box<AddressingMode<u8>>),
-    Rl(Box<AddressingMode<u8>>),
-    Rr(Box<AddressingMode<u8>>),
-    Sla(Box<AddressingMode<u8>>),
-    Sra(Box<AddressingMode<u8>>),
-    Swap(Box<AddressingMode<u8>>),
-    Srl(Box<AddressingMode<u8>>),
-    Bit(u8, Box<AddressingMode<u8>>),
-    Res(u8, Box<AddressingMode<u8>>),
-    Set(u8, Box<AddressingMode<u8>>)
+    Rlc(Box<dyn AddressingMode<u8>>),
+    Rrc(Box<dyn AddressingMode<u8>>),
+    Rl(Box<dyn AddressingMode<u8>>),
+    Rr(Box<dyn AddressingMode<u8>>),
+    Sla(Box<dyn AddressingMode<u8>>),
+    Sra(Box<dyn AddressingMode<u8>>),
+    Swap(Box<dyn AddressingMode<u8>>),
+    Srl(Box<dyn AddressingMode<u8>>),
+    Bit(u8, Box<dyn AddressingMode<u8>>),
+    Res(u8, Box<dyn AddressingMode<u8>>),
+    Set(u8, Box<dyn AddressingMode<u8>>)
 }
 
 impl fmt::Display for Instruction {
@@ -193,7 +193,7 @@ fn ind16_addr(word: u16) -> Box<IndirectAddressing<u16>> {
     Box::new(IndirectAddressing(word))
 }
 
-fn reg_addr_table(idx: u8) -> Box<AddressingMode<u8>> {
+fn reg_addr_table(idx: u8) -> Box<dyn AddressingMode<u8>> {
     match idx {
         0 => Box::new(RegisterAddressing(Register::B)),
         1 => Box::new(RegisterAddressing(Register::C)),
@@ -239,7 +239,7 @@ pub fn decode(cpu: &mut Cpu, bus: &Bus, opcode: u8, prefixed: bool) -> Instructi
                 (0, 1, 0, _, _) => Ld16(ind16_addr(cpu.step_next_word(bus)), reg_addr(SP)),
                 (0, 2, 0, _, _) => { cpu.step_next_word(bus); Stop },
                 (0, 3, 0, _, _) => Jr(Condition::None, imm8_addr(cpu.step_next_byte(bus))),
-                (0, 4...7, 0, _, _) => Jr(cond_table(y-4), imm8_addr(cpu.step_next_byte(bus))),
+                (0, 4..=7, 0, _, _) => Jr(cond_table(y-4), imm8_addr(cpu.step_next_byte(bus))),
                 // X=0, Z=1
                 (0, _, 1, 0, _) => Ld16(reg_addr(reg_pair_table(p)), imm16_addr(cpu.step_next_word(bus))),
                 (0, _, 1, 1, _) => Add16(reg_addr(HL), reg_addr(reg_pair_table(p))),
@@ -276,7 +276,7 @@ pub fn decode(cpu: &mut Cpu, bus: &Bus, opcode: u8, prefixed: bool) -> Instructi
                 // X=2
                 (2, _, _, _, _) => decode_alu(y, reg_addr_table(z)),
                 // X=3, Z=0
-                (3, 0...3, 0, _, _) => Ret(cond_table(y)),
+                (3, 0..=3, 0, _, _) => Ret(cond_table(y)),
                 (3, 4, 0, _, _) => Ldh(ind8_addr(cpu.step_next_byte(bus)), reg_addr(A)),
                 (3, 5, 0, _, _) => AddSp(imm8_addr(cpu.step_next_byte(bus))),
                 (3, 6, 0, _, _) => Ldh(reg_addr(A), ind8_addr(cpu.step_next_byte(bus))),
@@ -288,7 +288,7 @@ pub fn decode(cpu: &mut Cpu, bus: &Bus, opcode: u8, prefixed: bool) -> Instructi
                 (3, _, 1, 1, 2) => Jp(Condition::None, reg_addr(HL)),
                 (3, _, 1, 1, 3) => Ld16(reg_addr(SP), reg_addr(HL)),
                 // X=3, Z=2
-                (3, 0...3, 2, _, _) => Jp(cond_table(y), imm16_addr(cpu.step_next_word(bus))),
+                (3, 0..=3, 2, _, _) => Jp(cond_table(y), imm16_addr(cpu.step_next_word(bus))),
                 (3, 4, 2, _, _) => Ld8(regind_addr(C), reg_addr(A)),
                 (3, 5, 2, _, _) => Ld8(ind16_addr(cpu.step_next_word(bus)), reg_addr(A)),
                 (3, 6, 2, _, _) => Ld8(reg_addr(A), regind_addr(C)),
@@ -298,7 +298,7 @@ pub fn decode(cpu: &mut Cpu, bus: &Bus, opcode: u8, prefixed: bool) -> Instructi
                 (3, 6, 3, _, _) => Di,
                 (3, 7, 3, _, _) => Ei,
                 // X=3, Z=4
-                (3, 0...3, 4, _, _) => Call(cond_table(y), imm16_addr(cpu.step_next_word(bus))),
+                (3, 0..=3, 4, _, _) => Call(cond_table(y), imm16_addr(cpu.step_next_word(bus))),
                 // X=3, Z=5
                 (3, _, 5, 0, _) => Push(reg_addr(reg_pair_table(p + 4))),
                 (3, _, 5, 1, 0) => Call(Condition::None, imm16_addr(cpu.step_next_word(bus))),
@@ -334,7 +334,7 @@ pub fn decode(cpu: &mut Cpu, bus: &Bus, opcode: u8, prefixed: bool) -> Instructi
     instruction
 }
 
-fn decode_alu(y: u8, src: Box<AddressingMode<u8>>) -> Instruction {
+fn decode_alu(y: u8, src: Box<dyn AddressingMode<u8>>) -> Instruction {
     use self::Instruction::*;
 
     match y {         

@@ -30,7 +30,7 @@ impl fmt::Display for MapperType {
 
 pub struct Cartridge {
     rom: Vec<u8>,
-    mapper: Option<Box<Mapper>>
+    mapper: Option<Box<dyn Mapper>>
 }
 
 impl Cartridge {
@@ -182,7 +182,7 @@ fn total_ram_banks(code: u8) -> usize {
     }
 }
 
-fn create_mapper(mapper_type: MapperType, rom_banks: usize, ram_banks: usize) -> Box<Mapper> {
+fn create_mapper(mapper_type: MapperType, rom_banks: usize, ram_banks: usize) -> Box<dyn Mapper> {
     match mapper_type {
         MapperType::Mbc1 => Box::new(Mbc1::new(rom_banks, ram_banks)),
         _ => panic!("Mapper {} not implemented.", mapper_type)
