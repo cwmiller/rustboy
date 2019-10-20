@@ -39,9 +39,9 @@ impl<'a> Rustboy<'a> {
         let mut fps_counter_time = Instant::now();
         let mut fps_counter_frames = 0;
 
-        while self.window.is_open() && !self.window.is_key_down(Key::Escape) {
-            let buttons = get_button_presses(&self.window);
+        let mut buttons = Button::empty();
 
+        while self.window.is_open() && !self.window.is_key_down(Key::Escape) {
             // Execute the next CPU instruction. The number of cycles used is returned.
             let cycles = self.cpu.step(&mut self.bus);
 
@@ -70,7 +70,7 @@ impl<'a> Rustboy<'a> {
             }
 
             // LCD interrupts when VLANK is reached
-            // We'll use this time to update the framebuffer, record any key presses for the next frame, and update the FPS counter
+            // We'll use this time to update the framebuffer and FPS counter. Also we'll get the current pressed buttons
             if lcd_result.int_vblank {
                 self.cpu.interrupt(&mut self.bus, Interrupt::VBlank);
                 self.window.update_with_buffer(&self.screen_buffer).unwrap();
@@ -85,7 +85,45 @@ impl<'a> Rustboy<'a> {
                     fps_counter_time = Instant::now();
                     fps_counter_frames = 0;
                 }
+
+                self.set_button_presses(&mut buttons);
             }
+        }
+    }
+
+    fn set_button_presses(&self, buttons: &mut Button) {
+        *buttons = Button::empty();
+
+        if self.window.is_key_down(Key::Enter) {
+            *buttons |= Button::START;
+        }
+
+        if self.window.is_key_down(Key::RightShift) || self.window.is_key_down(Key::LeftShift) {
+            *buttons |= Button::SELECT;
+        }
+
+        if self.window.is_key_down(Key::Up) {
+            *buttons |= Button::UP;
+        }
+
+        if self.window.is_key_down(Key::Right) {
+            *buttons |= Button::RIGHT;
+        }
+
+        if self.window.is_key_down(Key::Down) {
+            *buttons |= Button::DOWN;
+        }
+
+        if self.window.is_key_down(Key::Left) {
+            *buttons |= Button::LEFT;
+        }
+
+        if self.window.is_key_down(Key::Z) {
+            *buttons |= Button::B;
+        }
+
+        if self.window.is_key_down(Key::X) {
+            *buttons |= Button::A;
         }
     }
 }
@@ -99,43 +137,4 @@ fn create_window(scale: Scale) -> Window {
             scale: scale,
             ..WindowOptions::default()
         }).expect("Unable to create window")
-}
-
-#[inline(always)]
-fn get_button_presses(window: &Window) -> Button {
-    let mut buttons: Button = Button::empty();
-
-    if window.is_key_down(Key::Enter) {
-        buttons |= Button::START;
-    }
-
-    if window.is_key_down(Key::RightShift) || window.is_key_down(Key::LeftShift) {
-        buttons |= Button::SELECT;
-    }
-
-    if window.is_key_down(Key::Up) {
-        buttons |= Button::UP;
-    }
-
-    if window.is_key_down(Key::Right) {
-        buttons |= Button::RIGHT;
-    }
-
-    if window.is_key_down(Key::Down) {
-        buttons |= Button::DOWN;
-    }
-
-    if window.is_key_down(Key::Left) {
-        buttons |= Button::LEFT;
-    }
-
-    if window.is_key_down(Key::Z) {
-        buttons |= Button::B;
-    }
-
-    if window.is_key_down(Key::X) {
-        buttons |= Button::A;
-    }
-
-    buttons
 }
