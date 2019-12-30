@@ -341,8 +341,18 @@ impl Addressable for Lcd {
 
     fn write(&mut self, addr: u16, val: u8) {
         match addr {
-            VIDEO_RAM_START..=VIDEO_RAM_END => self.vram[(addr - VIDEO_RAM_START) as usize] = val,
-            OAM_START..=OAM_END => self.oam[(addr - OAM_START) as usize] = val,
+            VIDEO_RAM_START..=VIDEO_RAM_END => {
+                // Only allow write if LCD is disabled or in Mode 00 (HBlank), 01 (VBLANK), or 10 (OAM)
+                if !self.lcdc.contains(Lcdc::LCDC_ENABLED) || self.mode != Mode::Transfer {
+                    self.vram[(addr - VIDEO_RAM_START) as usize] = val;
+                }
+            },
+            OAM_START..=OAM_END => {
+                // Only allow write if LCD is disabled or in Mode 00 (HBlank) or 01 (VBLANK)
+                if !self.lcdc.contains(Lcdc::LCDC_ENABLED) || self.mode == Mode::HBlank || self.mode == Mode::VBlank {
+                    self.oam[(addr - OAM_START) as usize] = val;
+                }
+            },
             ADDR_LCDC => {
                 self.lcdc = Lcdc::from_bits(val).unwrap();
 
