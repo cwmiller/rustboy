@@ -44,8 +44,8 @@ bitflags! {
 enum_from_primitive! {
     #[derive(Copy, Clone, PartialEq)]
     pub enum Mode {
-        VBlank   = 0,
-        HBlank   = 1,
+        HBlank   = 0,
+        VBlank   = 1,
         Oam      = 2,
         Transfer = 3
     }
@@ -132,7 +132,7 @@ impl Lcd {
 
         if self.lcdc.contains(Lcdc::LCDC_ENABLED) {
             let previous_mode = self.mode;
-            self.mode_cycles = self.mode_cycles + cycles;
+            self.mode_cycles += cycles;
 
             match self.mode {
                 Mode::Oam => {
@@ -141,7 +141,7 @@ impl Lcd {
                     if self.mode_cycles >= CYCLES_PER_OAM_READ {
                         // Move onto transfer stage
                         self.mode = Mode::Transfer;
-                        self.mode_cycles = 0;
+                        self.mode_cycles -= CYCLES_PER_OAM_READ;
                     }
                 },
                 Mode::Transfer => {
@@ -150,7 +150,7 @@ impl Lcd {
                     if self.mode_cycles >= CYCLES_PER_TRANSFER {
                         // Once transfer is complete, enter HBLANK
                         self.mode = Mode::HBlank;
-                        self.mode_cycles = 0;
+                        self.mode_cycles -= CYCLES_PER_TRANSFER;
                         self.draw_pending = true;
                     }
                 },
@@ -159,13 +159,12 @@ impl Lcd {
                     // HBlank phase lasts 201-207 cycles
                     if self.mode_cycles >= CYCLES_PER_HBLANK {
                         // LCD is ready to begin the next line
-                        self.ly = self.ly + 1;
-                        self.mode_cycles = 0;
+                        self.ly += 1;
+                        self.mode_cycles -= CYCLES_PER_HBLANK;
 
                         // If the LCD has line 144, then enter VBLANK. Else, enter OAM read.
                         if self.ly == 144 { 
                             self.mode = Mode::VBlank;
-                            self.mode_cycles = 0;
                             result.int_vblank = true;
 
                             if self.lcdc.contains(Lcdc::LCDC_SPRITE_DISPLAY) {
@@ -173,9 +172,9 @@ impl Lcd {
                             }
                         } else { 
                             self.mode = Mode::Oam;
-                        };
 
-                        self.check_coincidence(&mut result);
+                            self.check_coincidence(&mut result);
+                        };
                     } else {
                         if self.ly < 144 && self.draw_pending {
                             if self.lcdc.contains(Lcdc::LCDC_BG_DISPLAY) {
@@ -189,16 +188,16 @@ impl Lcd {
                 Mode::VBlank => {
                     // LCD is writing to VBlank lines
                     if self.mode_cycles >= CYCLES_PER_LINE {
-                        self.mode_cycles = 0;
+                        self.mode_cycles -= CYCLES_PER_LINE;
                         self.ly = self.ly + 1;
 
                         if self.ly > 153 {
                             // Finished with VBlank. Enter OAM with the first line.
                             self.ly = 0;
                             self.mode = Mode::Oam;
-                        }
 
-                        self.check_coincidence(&mut result);
+                            self.check_coincidence(&mut result);
+                        }
                     } 
                 }
             }
@@ -206,14 +205,14 @@ impl Lcd {
             // Check if a new mode has been entered during this step.
             // If so, an interrupt will be raised if the respective flag is set in the STAT register
             if self.mode != previous_mode {
-                let flag = match self.mode {
-                    Mode::VBlank   => Some(Stat::STAT_VBLANK_INT),
-                    Mode::HBlank   => Some(Stat::STAT_HBLANK_INT),
-                    Mode::Oam      => Some(Stat::STAT_OAM_INT),
-                    Mode::Transfer => None
+                let raise = match self.mode {
+                    Mode::HBlank   => self.stat.contains(Stat::STAT_HBLANK_INT) || self.stat.contains(Stat::STAT_OAM_INT),
+                    Mode::VBlank   => self.stat.contains(Stat::STAT_VBLANK_INT),
+                    Mode::Oam      => self.stat.contains(Stat::STAT_OAM_INT),
+                    Mode::Transfer => false
                 };
 
-                if flag.is_some() && self.stat.contains(flag.unwrap()) {
+                if raise {
                     result.int_stat = true;
                 }
             }
@@ -326,7 +325,7 @@ impl Addressable for Lcd {
             VIDEO_RAM_START..=VIDEO_RAM_END => self.vram[(addr - VIDEO_RAM_START) as usize],
             OAM_START..=OAM_END => self.oam[(addr - OAM_START) as usize],
             ADDR_LCDC => self.lcdc.bits,
-            ADDR_STAT => 0b1000_0000 | ((self.stat.bits & 0b1111_1100) | (self.mode as u8)),
+            ADDR_STAT => 0b1000_0000 | ((self.stat.bits & 0b0111_1100) | (self.mode as u8)),
             ADDR_SCY => self.scy,
             ADDR_SCX => self.scx,
             ADDR_LY => self.ly,
@@ -344,11 +343,19 @@ impl Addressable for Lcd {
         match addr {
             VIDEO_RAM_START..=VIDEO_RAM_END => self.vram[(addr - VIDEO_RAM_START) as usize] = val,
             OAM_START..=OAM_END => self.oam[(addr - OAM_START) as usize] = val,
-            ADDR_LCDC => self.lcdc.bits = val,
-            ADDR_STAT => {
-                self.stat.bits = val & 0b1111_1100;
-                self.mode = Mode::from_u8(val & 0b11).unwrap();
+            ADDR_LCDC => {
+                self.lcdc = Lcdc::from_bits(val).unwrap();
+
+                // Reset internal counters if display disabled
+                // LCDC mode goes back to 0 (HBlank)
+                if !self.lcdc.contains(Lcdc::LCDC_ENABLED) {
+                    self.mode_cycles = 0;
+                    self.ly = 0;
+                    self.mode = Mode::HBlank;
+
+                }
             },
+            ADDR_STAT => self.stat.bits = val & 0b1111_1100,
             ADDR_SCY => self.scy = val,
             ADDR_SCX => self.scx = val,
             ADDR_LY => (), // read-only
