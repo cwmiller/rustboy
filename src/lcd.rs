@@ -80,6 +80,21 @@ impl Palette {
     }
 }
 
+#[derive(Default, Copy, Clone)]
+struct OamEntry {
+    y: u8,
+    x: u8,
+    tile: u8,
+    attrs: u8 
+}
+
+const OAM_ATTR_OBJ_PRIORITY: u8     = 0b1000_0000;
+const OAM_ATTR_Y_FLIP: u8           = 0b0100_0000;
+const OAM_ATTR_X_FLIP: u8           = 0b0010_0000;
+const OAM_ATTR_PALETTE_DMG: u8      = 0b0001_0000;
+const OAM_ATTR_TILE_BANK_CGB: u8    = 0b0000_1000;
+const OAM_ATTR_PALETTE_CGB: u8      = 0b0000_0111;
+
 #[derive(Default)]
 pub struct StepResult {
     pub int_vblank: bool,
@@ -88,7 +103,7 @@ pub struct StepResult {
 
 pub struct Lcd {
     vram: [u8; (VIDEO_RAM_END - VIDEO_RAM_START) as usize + 1],
-    oam: [u8; (OAM_END - OAM_START) as usize + 1],
+    oam: [OamEntry; (OAM_END - OAM_START) as usize + 1],
     lcdc: Lcdc,
     stat: Stat,
     scy: u8,
@@ -109,7 +124,7 @@ impl Lcd {
     pub fn new() -> Self {
         Self {
             vram: [0; (VIDEO_RAM_END - VIDEO_RAM_START) as usize + 1],
-            oam: [0; (OAM_END - OAM_START) as usize + 1],
+            oam: [OamEntry::default(); (OAM_END - OAM_START) as usize + 1],
             lcdc: Lcdc::from_bits(0x91).unwrap(),
             stat: Stat::empty(),
             scy: 0,
@@ -249,24 +264,35 @@ impl Lcd {
     fn draw_sprites(&self, screen_buffer: &mut [u32]) {
         // Sprites are 40 blocks in OAM. Each block is 32 bits
         for idx in 0..40 {
-            let y = self.oam[idx * 4] as usize;
-            let x = self.oam[(idx * 4) + 1] as usize;
-            let pattern =  self.oam[(idx * 4) + 2];
-            let flags = self.oam[(idx * 4) + 3];
+            let entry = &self.oam[idx as usize];
+            // X,Y values are offset by 8,16
+            let y = (entry.y as isize) - 16;
+            let x = (entry.x as isize) - 8;
 
-            if x >= 8 && y >= 16 {
-                let tile_addr = self.sprite_tile_address(pattern);
-                let screen_x = x.wrapping_sub(8) as usize;
-                let screen_y = y.wrapping_sub(16) as usize;
-                let palette = if flags & 0b10000 == 0b10000 { self.obp1 } else { self.obp0 };
+            if x > -8 && x < 160 && y > -16 && y < 144 {
+                let tile_addr = self.sprite_tile_address(entry.tile);
+                
+                // In DMG, the sprite can use one of two
+                let palette = if entry.attrs & OAM_ATTR_PALETTE_DMG == OAM_ATTR_PALETTE_DMG { 
+                    self.obp1 
+                } else { 
+                    self.obp0 
+                };
 
-                for row in 0..8 as usize {
-                    for column in 0..8 as usize {
-                        let idx = ((screen_y + row) * SCREEN_WIDTH) + screen_x + column;
-                        let shade = self.tile_pixel_shade(tile_addr, row as u8, column as u8);
+                for row in 0..8 as isize {
+                    for column in 0..8 as isize {
+                        let screen_y = y + row;
+                        let screen_x = x + column;
 
-                        if idx < screen_buffer.len() && shade != Shade::White {
-                            screen_buffer[idx] = palette.rgb(shade);
+                        // Only draw if pixel is on screen
+                        if screen_y >= 0 && screen_y < 144 && screen_x >= 0 && screen_x < 160 {
+                            let idx = (screen_y as usize * SCREEN_WIDTH) + screen_x as usize;
+                            let shade = self.tile_pixel_shade(tile_addr, row as u8, column as u8);
+
+                            // White shade is invisible
+                            if shade != Shade::White {
+                                screen_buffer[idx] = palette.rgb(shade);
+                            }
                         }
                     }
                 }
@@ -314,6 +340,7 @@ impl Lcd {
         }
     }
 
+    #[inline(always)]
     fn sprite_tile_address(&self, tile_index: u8) -> u16 {
         0x8000 + ((tile_index as u16) * 16)
     }
@@ -323,7 +350,20 @@ impl Addressable for Lcd {
     fn read(&self, addr: u16) -> u8 {
         match addr {
             VIDEO_RAM_START..=VIDEO_RAM_END => self.vram[(addr - VIDEO_RAM_START) as usize],
-            OAM_START..=OAM_END => self.oam[(addr - OAM_START) as usize],
+            OAM_START..=OAM_END => {
+                let start = (addr - OAM_START) as usize;
+                let entry_idx = start / 4;
+                let offset = start % 4;
+                let entry = &self.oam[entry_idx];
+
+                match offset {
+                    0 => entry.y,
+                    1 => entry.x,
+                    2 => entry.tile,
+                    3 => entry.attrs,
+                    _ => unreachable!()
+                }
+            },
             ADDR_LCDC => self.lcdc.bits,
             ADDR_STAT => 0b1000_0000 | ((self.stat.bits & 0b0111_1100) | (self.mode as u8)),
             ADDR_SCY => self.scy,
@@ -350,7 +390,18 @@ impl Addressable for Lcd {
             OAM_START..=OAM_END => {
                 // Only allow write if LCD is disabled or in Mode 00 (HBlank) or 01 (VBLANK)
                 if !self.lcdc.contains(Lcdc::LCDC_ENABLED) || self.mode == Mode::HBlank || self.mode == Mode::VBlank {
-                    self.oam[(addr - OAM_START) as usize] = val;
+                    let start = (addr - OAM_START) as usize;
+                    let entry_idx = start / 4;
+                    let offset = start % 4;
+                    let mut entry = &mut self.oam[entry_idx];
+
+                    match offset {
+                        0 => { entry.y = val },
+                        1 => { entry.x = val },
+                        2 => { entry.tile = val },
+                        3 => { entry.attrs = val },
+                        _ => unreachable!()
+                    }
                 }
             },
             ADDR_LCDC => {
