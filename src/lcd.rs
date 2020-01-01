@@ -281,8 +281,19 @@ impl Lcd {
 
                 for row in 0..8 as isize {
                     for column in 0..8 as isize {
-                        let screen_y = y + row;
-                        let screen_x = x + column;
+                        // Sprite can be vertically flipped
+                        let screen_y = if entry.attrs & OAM_ATTR_Y_FLIP == OAM_ATTR_Y_FLIP {
+                            y + (row - 8).abs()
+                        } else {
+                            y + row
+                        };
+
+                        // Sprite can also be horizontally flipped
+                        let screen_x = if entry.attrs & OAM_ATTR_X_FLIP == OAM_ATTR_X_FLIP {
+                            x + (column - 8).abs()
+                        } else {
+                            x + column
+                        };
 
                         // Only draw if pixel is on screen
                         if screen_y >= 0 && screen_y < 144 && screen_x >= 0 && screen_x < 160 {
