@@ -23,7 +23,7 @@ bitflags! {
         const LCDC_WIN_DISPLAY        = 0b0010_0000;
         const LCDC_UNSIGNED_TILE_DATA = 0b0001_0000;
         const LCDC_BG_TILE_9C         = 0b0000_1000;
-        const LCDC_16PX_SPRITE        = 0b0000_0100;
+        const LCDC_8X16_SPRITE        = 0b0000_0100;
         const LCDC_SPRITE_DISPLAY     = 0b0000_0010;
         const LCDC_BG_DISPLAY         = 0b0000_0001;
     }
@@ -269,6 +269,9 @@ impl Lcd {
             let y = (entry.y as isize) - 16;
             let x = (entry.x as isize) - 8;
 
+            // Sprites can be 8x8 or 8x16
+            let spr_height = if self.lcdc.contains(Lcdc::LCDC_8X16_SPRITE) { 16 } else { 8 };
+
             if x > -8 && x < 160 && y > -16 && y < 144 {
                 let tile_addr = self.sprite_tile_address(entry.tile);
                 
@@ -279,11 +282,11 @@ impl Lcd {
                     self.obp0 
                 };
 
-                for row in 0..8 as isize {
+                for row in 0..spr_height as isize {
                     for column in 0..8 as isize {
                         // Sprite can be vertically flipped
                         let screen_y = if entry.attrs & OAM_ATTR_Y_FLIP == OAM_ATTR_Y_FLIP {
-                            y + (row - 8).abs()
+                            y + (row - spr_height).abs()
                         } else {
                             y + row
                         };
