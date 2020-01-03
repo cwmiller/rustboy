@@ -5,7 +5,11 @@ use cpu::{Cpu, Interrupt};
 use joypad::Button;
 use lcd::{SCREEN_WIDTH, SCREEN_HEIGHT};
 use minifb::{Key, Scale, WindowOptions, Window};
-use std::time::Instant;
+use std::time::{Instant, Duration};
+use std::thread;
+
+const CYCLES_PER_FRAME: usize = 69905;
+const MS_PER_FRAME: u128 = 16;
 
 pub struct Rustboy<'a> {
     bus: Bus<'a>,
@@ -36,14 +40,19 @@ impl<'a> Rustboy<'a> {
         self.cpu.reset();
 
         // FPS counter variables
-        let mut fps_counter_time = Instant::now();
-        let mut fps_counter_frames = 0;
+        //let mut fps_counter_time = Instant::now();
+        //let mut fps_counter_frames = 0;
+
+        let mut cycles_since_last_frame = 0;
+        let mut time_since_last_frame = Instant::now();
 
         let mut buttons = Button::empty();
 
         while self.window.is_open() && !self.window.is_key_down(Key::Escape) {
             // Execute the next CPU instruction. The number of cycles used is returned.
             let cycles = self.cpu.step(&mut self.bus);
+
+            cycles_since_last_frame += cycles;
 
             // Step timer
             let timer_result = self.bus.timer.step(cycles);
@@ -75,6 +84,19 @@ impl<'a> Rustboy<'a> {
                 self.cpu.interrupt(&mut self.bus, Interrupt::VBlank);
                 self.window.update_with_buffer(&self.screen_buffer).unwrap();
 
+                if cycles_since_last_frame > CYCLES_PER_FRAME {
+                    let elapsed = time_since_last_frame.elapsed();
+
+                    if elapsed.as_millis() < MS_PER_FRAME {
+                        // Sleep for the remaining time
+                        thread::sleep(Duration::from_millis((MS_PER_FRAME - elapsed.as_millis()) as u64))
+                    }
+                }
+
+                cycles_since_last_frame = 0;
+                time_since_last_frame = Instant::now();
+
+                /*
                 fps_counter_frames += 1;
 
                 // If a second has passed, update the FPS counter
@@ -85,6 +107,7 @@ impl<'a> Rustboy<'a> {
                     fps_counter_time = Instant::now();
                     fps_counter_frames = 0;
                 }
+                */
 
                 self.set_button_presses(&mut buttons);
             }
