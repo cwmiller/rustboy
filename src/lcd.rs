@@ -41,6 +41,11 @@ bitflags! {
     }
 }
 
+// The LCD driver is always in one of four states:
+// HBlank - Current line has finished rendering
+// VBlank - All visible lines have been rendered
+// Oam - Driver is reading data from OAM
+// Transfer - Current line is being rendered using OAM & VRAM
 enum_from_primitive! {
     #[derive(Copy, Clone, PartialEq)]
     pub enum Mode {
@@ -51,6 +56,12 @@ enum_from_primitive! {
     }
 }
 
+const CYCLES_PER_OAM_READ: usize = 80;
+const CYCLES_PER_TRANSFER: usize = 172;
+const CYCLES_PER_HBLANK: usize = 204;
+const CYCLES_PER_LINE: usize = 456;
+
+// DMG can only display four beautiful shades of color
 enum_from_primitive! {
     #[derive(Copy, Clone, PartialEq)]
     enum Shade {
@@ -60,11 +71,6 @@ enum_from_primitive! {
         Black       = 3
     }
 }
-
-const CYCLES_PER_OAM_READ: usize = 80;
-const CYCLES_PER_TRANSFER: usize = 172;
-const CYCLES_PER_HBLANK: usize = 204;
-const CYCLES_PER_LINE: usize = 456;
 
 #[derive(Copy, Clone)]
 struct Palette(u8);
@@ -80,6 +86,7 @@ impl Palette {
     }
 }
 
+// Represents an OAM (Sprite data)
 #[derive(Default, Copy, Clone)]
 struct OamEntry {
     y: u8,
@@ -191,10 +198,10 @@ impl Lcd {
                             self.check_coincidence(&mut result);
                         };
                     } else {
+                        // Draw the current line if we're not in VBLANK period
                         if self.ly < 144 && self.draw_pending {
-                            if self.lcdc.contains(Lcdc::LCDC_BG_DISPLAY) {
-                                self.draw_background_line(screen_buffer);
-                            }
+                            self.draw_current_background_line(screen_buffer);
+                            self.draw_current_window_line(screen_buffer);
 
                             self.draw_pending = false;
                         }
@@ -236,31 +243,100 @@ impl Lcd {
         result
     }
 
-    fn draw_background_line(&self, screen_buffer: &mut [u32]) {
-        let map_y = self.scy.wrapping_add(self.ly);
-        let map_tile_y = (map_y / 8) as u16;
-        let tile_row = map_y & 7;
+    // Draws the background for the current line specified in LY
+    fn draw_current_background_line(&self, screen_buffer: &mut [u32]) {
+        if self.lcdc.contains(Lcdc::LCDC_BG_DISPLAY) {
+            // Background can be scrolled via the SCX and SCY registers
+            let map_y = self.scy.wrapping_add(self.ly);
 
+            for screen_x in 0..SCREEN_WIDTH as u8 {
+                let map_x = self.scx.wrapping_add(screen_x);
+
+                self.draw_bg_tile(map_x, map_y, screen_x, self.ly, screen_buffer);
+            }
+        }
+    }
+
+    // Draws the window for the current line specified in LY
+    fn draw_current_window_line(&self, screen_buffer: &mut [u32]) {
+        if self.lcdc.contains(Lcdc::LCDC_WIN_DISPLAY) {
+            // Window cannot scroll. The top-left is specified by the WY and WX registers. 
+            // They are in relation to the top-left of the physical screen.
+            // Only display if WX=0..166, WY=0..143
+            if self.wx < 166 && self.wy < 143 {
+                if self.ly >= self.wy {
+                    let map_y = self.ly - self.wy;
+
+                    // X position is really WX - 7
+                    let windowx = (self.wx as isize) - 7;
+
+                    for screen_x in 0..SCREEN_WIDTH as u8 {
+                        if windowx <= (screen_x as isize) {
+                            let map_x = screen_x - (windowx as u8);
+
+                            self.draw_win_tile(map_x, map_y, screen_x, self.ly, screen_buffer);
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    // Draws a background tile at the given coordinates.
+    // map_x and map_y are the coordinates in the tile map
+    // screen_x and screen_y are the coordinates of the physical screen
+    fn draw_bg_tile(&self, map_x: u8, map_y: u8, screen_x: u8, screen_y: u8, screen_buffer: &mut [u32]) {
         let map_addr_base = if self.lcdc.contains(Lcdc::LCDC_BG_TILE_9C) {
             0x9C00
         } else {
             0x9800
         } as u16;
 
-        for screen_x in 0..SCREEN_WIDTH {
-            let map_x = self.scx.wrapping_add(screen_x as u8);
-            let map_tile_x = (map_x / 8) as u16;
-            let tile_column = map_x & 7;
-
-            let tile_idx_addr = map_addr_base + (map_tile_y * 32) + map_tile_x;
-            let tile_idx = self.vram[(tile_idx_addr - VIDEO_RAM_START) as usize];
-            let tile_addr = self.bg_tile_address(tile_idx);
-            let shade = self.tile_pixel_shade(tile_addr, tile_row, tile_column);
-
-            screen_buffer[(self.ly as usize * SCREEN_WIDTH) + screen_x] = self.bgp.rgb(shade);
-        }
+        self.draw_tile(map_addr_base, map_x, map_y, screen_x, screen_y, screen_buffer);
     }
 
+    // Draws a window tile at the given coordinates.
+    // map_x and map_y are the coordinates in the tile map
+    // screen_x and screen_y are the coordinates of the physical screen
+    fn draw_win_tile(&self, map_x: u8, map_y: u8, screen_x: u8, screen_y: u8, screen_buffer: &mut [u32]) {
+        let map_addr_base = if self.lcdc.contains(Lcdc::LCDC_WIN_TILE_9C) {
+            0x9C00
+        } else {
+            0x9800
+        } as u16;
+
+        self.draw_tile(map_addr_base, map_x, map_y, screen_x, screen_y, screen_buffer);
+    }
+
+    // Draws a tile at the given coordinates.
+    // map_addr_base is either 0x9C00 or 0x9800
+    // map_x and map_y are the coordinates in the tile map
+    // screen_x and screen_y are the coordinates of the physical screen
+    fn draw_tile(&self, map_addr_base: u16, map_x: u8, map_y: u8, screen_x: u8, screen_y: u8, screen_buffer: &mut [u32]) {
+        // Each tile is 8x8 pixels.
+        // Get the X,Y positions of the tile boundaries
+        let map_tile_y = (map_y / 8) as u16;
+        let map_tile_x = (map_x / 8) as u16;
+
+        // Get the X,Y coordinates within the tile for the given map X,Y
+        let tile_row = map_y & 7;
+        let tile_column = map_x & 7;
+
+        // Background Tile Table is a 32x32 byte array containing the the index of each tile
+        let tile_idx_addr = map_addr_base + (map_tile_y * 32) + map_tile_x;
+        let tile_idx = self.vram[(tile_idx_addr - VIDEO_RAM_START) as usize];
+
+        // The tile index is used to get the address in the Tile Pattern Table that contains the tile pixel data
+        let tile_addr = self.tile_address(tile_idx);
+
+        // Read the Tile Pattern Table to get what color pixel to display at the given screen coordinates
+        let shade = self.tile_pixel_shade(tile_addr, tile_row, tile_column);
+
+        screen_buffer[(screen_y as usize * SCREEN_WIDTH) + screen_x as usize] = self.bgp.rgb(shade);
+    }
+
+    // Draws all sprites on the screen.
+    // Unlike the background and window draw functions, this draws to the entire screen instead of the current line in LY
     fn draw_sprites(&self, screen_buffer: &mut [u32]) {
         // Sprites are 40 blocks in OAM. Each block is 32 bits
         for idx in 0..40 {
@@ -275,11 +351,11 @@ impl Lcd {
             if x > -8 && x < 160 && y > -16 && y < 144 {
                 let tile_addr = self.sprite_tile_address(entry.tile);
                 
-                // In DMG, the sprite can use one of two
+                // In DMG, the sprite can use one of two palletes
                 let palette = if entry.attrs & OAM_ATTR_PALETTE_DMG == OAM_ATTR_PALETTE_DMG { 
                     self.obp1 
                 } else { 
-                    self.obp0 
+                    self.obp0
                 };
 
                 for row in 0..spr_height as isize {
@@ -314,6 +390,7 @@ impl Lcd {
         }
     }
 
+    // Gets the shade of a pixel within a tile
     fn tile_pixel_shade(&self, address: u16, row: u8, column: u8) -> Shade {
         let upper_byte = self.vram[((address + (row * 2) as u16) + 1 - VIDEO_RAM_START) as usize];
         let lower_byte = self.vram[((address + (row * 2) as u16) - VIDEO_RAM_START) as usize];
@@ -326,6 +403,7 @@ impl Lcd {
         Shade::from_u8((upper_bit << 1) | lower_bit).unwrap()
     }
 
+    // A cycle can raise a STAT interrupt when LY matches LYC
     fn check_coincidence(&mut self, result: &mut StepResult) {
         if self.stat.contains(Stat::STAT_COINCIDENCE_INT) {
             if self.ly == self.lyc {
@@ -339,7 +417,10 @@ impl Lcd {
         }
     }
 
-    fn bg_tile_address(&self, tile_index: u8) -> u16 {
+    // Gets the memory address for the given tile
+    fn tile_address(&self, tile_index: u8) -> u16 {
+        // Tile data can be in two spots. Either 0x8000 where the patterns are indexed with unsigned numbers,
+        // or 0x9000 where the indexes are signed 
         let tile_addr_base = if self.lcdc.contains(Lcdc::LCDC_UNSIGNED_TILE_DATA) {
             0x8000
         } else {
@@ -354,6 +435,8 @@ impl Lcd {
         }
     }
 
+    // Gets the memory address for the given sprite tile index
+    // Sprite pattern numbers are always unsigned starting in address 0x8000
     #[inline(always)]
     fn sprite_tile_address(&self, tile_index: u8) -> u16 {
         0x8000 + ((tile_index as u16) * 16)
