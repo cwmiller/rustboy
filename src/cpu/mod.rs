@@ -83,6 +83,9 @@ static PREFIXED_CYCLES: &'static [(usize, usize)] = &[
     (8, 8), (8, 8), (8, 8), (8, 8), (8, 8), (8, 8), (16, 16), (8, 8), (8, 8), (8, 8), (8, 8), (8, 8), (8, 8), (8, 8), (16, 16), (8, 8)
 ];
 
+const DISPATCH_CYCLES: usize = 20; 
+const CLEAR_HALT_CYCLES: usize = 4;
+
 pub struct Cpu {
     pub regs: Registers,
     ime: bool,
@@ -117,17 +120,17 @@ impl Cpu {
             self.handle_interrupt(bus, interrupt.unwrap());
             
             // It takes 20 cycles to dispatch interrupt, 24 if HALTed.
-            used_cycles += 20;
+            used_cycles += DISPATCH_CYCLES;
 
             if self.halted {
                 // Clear HALT.
                 self.halted = false;
-                used_cycles += 4;   
+                used_cycles += CLEAR_HALT_CYCLES;   
             }
         // An an interrupt is pending, interrupts are disabled, and the CPU is halted, then unhalt the CPU
         } else if interrupt.is_some() & !self.ime && self.halted {
             self.halted = false;
-            used_cycles += 4;
+            used_cycles += CLEAR_HALT_CYCLES;
         // CPU is halted and there's no interrupt
         } else if self.halted {
             used_cycles += 1;

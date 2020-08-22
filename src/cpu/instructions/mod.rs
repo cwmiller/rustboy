@@ -169,28 +169,20 @@ fn cond_table(idx: u8) -> Condition {
     }
 }
 
-fn reg_addr(reg: Register) -> Box<RegisterAddressing> {
-    Box::new(RegisterAddressing(reg))
+macro_rules! reg_addr {
+    ($reg:expr) => { Box::new(RegisterAddressing($reg)) };
 }
 
-fn regind_addr(reg: Register) -> Box<RegisterIndirectAddressing> {
-    Box::new(RegisterIndirectAddressing(reg))
+macro_rules! regind_addr {
+    ($reg:expr) => { Box::new(RegisterIndirectAddressing($reg)) };
 }
 
-fn imm8_addr(byte: u8) -> Box<ImmediateAddressing<u8>> {
-    Box::new(ImmediateAddressing(byte))
+macro_rules! imm_addr {
+    ($val:expr) => { Box::new(ImmediateAddressing($val)) };
 }
 
-fn imm16_addr(word: u16) -> Box<ImmediateAddressing<u16>> {
-    Box::new(ImmediateAddressing(word))
-}
-
-fn ind8_addr(byte: u8) -> Box<IndirectAddressing<u8>> {
-    Box::new(IndirectAddressing(byte))
-}
-
-fn ind16_addr(word: u16) -> Box<IndirectAddressing<u16>> {
-    Box::new(IndirectAddressing(word))
+macro_rules! ind_addr {
+    ($val:expr) => { Box::new(IndirectAddressing($val)) };
 }
 
 fn reg_addr_table(idx: u8) -> Box<dyn AddressingMode<u8>> {
@@ -236,31 +228,31 @@ pub fn decode(cpu: &mut Cpu, bus: &Bus, opcode: u8, prefixed: bool) -> Instructi
             match (x, y, z, q, p) {
                 // X=0, Z=0
                 (0, 0, 0, _, _) => Nop,
-                (0, 1, 0, _, _) => Ld16(ind16_addr(cpu.step_next_word(bus)), reg_addr(SP)),
+                (0, 1, 0, _, _) => Ld16(ind_addr!(cpu.step_next_word(bus)), reg_addr!(SP)),
                 (0, 2, 0, _, _) => { cpu.step_next_word(bus); Stop },
-                (0, 3, 0, _, _) => Jr(Condition::None, imm8_addr(cpu.step_next_byte(bus))),
-                (0, 4..=7, 0, _, _) => Jr(cond_table(y-4), imm8_addr(cpu.step_next_byte(bus))),
+                (0, 3, 0, _, _) => Jr(Condition::None, imm_addr!(cpu.step_next_byte(bus))),
+                (0, 4..=7, 0, _, _) => Jr(cond_table(y-4), imm_addr!(cpu.step_next_byte(bus))),
                 // X=0, Z=1
-                (0, _, 1, 0, _) => Ld16(reg_addr(reg_pair_table(p)), imm16_addr(cpu.step_next_word(bus))),
-                (0, _, 1, 1, _) => Add16(reg_addr(HL), reg_addr(reg_pair_table(p))),
+                (0, _, 1, 0, _) => Ld16(reg_addr!(reg_pair_table(p)), imm_addr!(cpu.step_next_word(bus))),
+                (0, _, 1, 1, _) => Add16(reg_addr!(HL), reg_addr!(reg_pair_table(p))),
                 // X=0, Z=2
-                (0, _, 2, 0, 0) => Ld8(regind_addr(BC), reg_addr(A)),
-                (0, _, 2, 0, 1) => Ld8(regind_addr(DE), reg_addr(A)),
-                (0, _, 2, 0, 2) => Ldi(regind_addr(HL), reg_addr(A)),
-                (0, _, 2, 0, 3) => Ldd(regind_addr(HL), reg_addr(A)),
-                (0, _, 2, 1, 0) => Ld8(reg_addr(A), regind_addr(BC)),
-                (0, _, 2, 1, 1) => Ld8(reg_addr(A), regind_addr(DE)),
-                (0, _, 2, 1, 2) => Ldi(reg_addr(A), regind_addr(HL)),
-                (0, _, 2, 1, 3) => Ldd(reg_addr(A), regind_addr(HL)),
+                (0, _, 2, 0, 0) => Ld8(regind_addr!(BC), reg_addr!(A)),
+                (0, _, 2, 0, 1) => Ld8(regind_addr!(DE), reg_addr!(A)),
+                (0, _, 2, 0, 2) => Ldi(regind_addr!(HL), reg_addr!(A)),
+                (0, _, 2, 0, 3) => Ldd(regind_addr!(HL), reg_addr!(A)),
+                (0, _, 2, 1, 0) => Ld8(reg_addr!(A), regind_addr!(BC)),
+                (0, _, 2, 1, 1) => Ld8(reg_addr!(A), regind_addr!(DE)),
+                (0, _, 2, 1, 2) => Ldi(reg_addr!(A), regind_addr!(HL)),
+                (0, _, 2, 1, 3) => Ldd(reg_addr!(A), regind_addr!(HL)),
                 // X=0, Z=3
-                (0, _, 3, 0, _) => Inc16(reg_addr(reg_pair_table(p))),
-                (0, _, 3, 1, _) => Dec16(reg_addr(reg_pair_table(p))),
+                (0, _, 3, 0, _) => Inc16(reg_addr!(reg_pair_table(p))),
+                (0, _, 3, 1, _) => Dec16(reg_addr!(reg_pair_table(p))),
                 // X=0, Z=4
                 (0, _, 4, _, _) => Inc8(reg_addr_table(y)),
                 // X=0, Z=5
                 (0, _, 5, _, _) => Dec8(reg_addr_table(y)),
                 // X=0, Z=6
-                (0, _, 6, _, _) => Ld8(reg_addr_table(y), imm8_addr(cpu.step_next_byte(bus))),
+                (0, _, 6, _, _) => Ld8(reg_addr_table(y), imm_addr!(cpu.step_next_byte(bus))),
                 // X=0, Z=7
                 (0, 0, 7, _, _) => Rlca,
                 (0, 1, 7, _, _) => Rrca,
@@ -277,33 +269,33 @@ pub fn decode(cpu: &mut Cpu, bus: &Bus, opcode: u8, prefixed: bool) -> Instructi
                 (2, _, _, _, _) => decode_alu(y, reg_addr_table(z)),
                 // X=3, Z=0
                 (3, 0..=3, 0, _, _) => Ret(cond_table(y)),
-                (3, 4, 0, _, _) => Ldh(ind8_addr(cpu.step_next_byte(bus)), reg_addr(A)),
-                (3, 5, 0, _, _) => AddSp(imm8_addr(cpu.step_next_byte(bus))),
-                (3, 6, 0, _, _) => Ldh(reg_addr(A), ind8_addr(cpu.step_next_byte(bus))),
-                (3, 7, 0, _, _) => Ldhl(imm8_addr(cpu.step_next_byte(bus))),
+                (3, 4, 0, _, _) => Ldh(ind_addr!(cpu.step_next_byte(bus)), reg_addr!(A)),
+                (3, 5, 0, _, _) => AddSp(imm_addr!(cpu.step_next_byte(bus))),
+                (3, 6, 0, _, _) => Ldh(reg_addr!(A), ind_addr!(cpu.step_next_byte(bus))),
+                (3, 7, 0, _, _) => Ldhl(imm_addr!(cpu.step_next_byte(bus))),
                 // X=3, Z=1
-                (3, _, 1, 0, _) => Pop(reg_addr(reg_pair_table(p + 4))),
+                (3, _, 1, 0, _) => Pop(reg_addr!(reg_pair_table(p + 4))),
                 (3, _, 1, 1, 0) => Ret(Condition::None),
                 (3, _, 1, 1, 1) => Reti,
-                (3, _, 1, 1, 2) => Jp(Condition::None, reg_addr(HL)),
-                (3, _, 1, 1, 3) => Ld16(reg_addr(SP), reg_addr(HL)),
+                (3, _, 1, 1, 2) => Jp(Condition::None, reg_addr!(HL)),
+                (3, _, 1, 1, 3) => Ld16(reg_addr!(SP), reg_addr!(HL)),
                 // X=3, Z=2
-                (3, 0..=3, 2, _, _) => Jp(cond_table(y), imm16_addr(cpu.step_next_word(bus))),
-                (3, 4, 2, _, _) => Ld8(regind_addr(C), reg_addr(A)),
-                (3, 5, 2, _, _) => Ld8(ind16_addr(cpu.step_next_word(bus)), reg_addr(A)),
-                (3, 6, 2, _, _) => Ld8(reg_addr(A), regind_addr(C)),
-                (3, 7, 2, _, _) => Ld8(reg_addr(A), ind16_addr(cpu.step_next_word(bus))),
+                (3, 0..=3, 2, _, _) => Jp(cond_table(y), imm_addr!(cpu.step_next_word(bus))),
+                (3, 4, 2, _, _) => Ld8(regind_addr!(C), reg_addr!(A)),
+                (3, 5, 2, _, _) => Ld8(ind_addr!(cpu.step_next_word(bus)), reg_addr!(A)),
+                (3, 6, 2, _, _) => Ld8(reg_addr!(A), regind_addr!(C)),
+                (3, 7, 2, _, _) => Ld8(reg_addr!(A), ind_addr!(cpu.step_next_word(bus))),
                 // X=3, Z=3
-                (3, 0, 3, _, _) => Jp(Condition::None, imm16_addr(cpu.step_next_word(bus))),
+                (3, 0, 3, _, _) => Jp(Condition::None, imm_addr!(cpu.step_next_word(bus))),
                 (3, 6, 3, _, _) => Di,
                 (3, 7, 3, _, _) => Ei,
                 // X=3, Z=4
-                (3, 0..=3, 4, _, _) => Call(cond_table(y), imm16_addr(cpu.step_next_word(bus))),
+                (3, 0..=3, 4, _, _) => Call(cond_table(y), imm_addr!(cpu.step_next_word(bus))),
                 // X=3, Z=5
-                (3, _, 5, 0, _) => Push(reg_addr(reg_pair_table(p + 4))),
-                (3, _, 5, 1, 0) => Call(Condition::None, imm16_addr(cpu.step_next_word(bus))),
+                (3, _, 5, 0, _) => Push(reg_addr!(reg_pair_table(p + 4))),
+                (3, _, 5, 1, 0) => Call(Condition::None, imm_addr!(cpu.step_next_word(bus))),
                 // X=3, Z=6
-                (3, _, 6, _, _) => decode_alu(y, imm8_addr(cpu.step_next_byte(bus))),
+                (3, _, 6, _, _) => decode_alu(y, imm_addr!(cpu.step_next_byte(bus))),
                 // X=3, Z=7
                 (3, _, 7, _, _) => Rst(y),
                 _ => unreachable!()
