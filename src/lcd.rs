@@ -164,6 +164,7 @@ impl Lcd {
                         // Move onto transfer stage
                         self.mode = Mode::Transfer;
                         self.mode_cycles -= CYCLES_PER_OAM_READ;
+                        self.draw_pending = true;
                     }
                 },
                 Mode::Transfer => {
@@ -173,7 +174,12 @@ impl Lcd {
                         // Once transfer is complete, enter HBLANK
                         self.mode = Mode::HBlank;
                         self.mode_cycles -= CYCLES_PER_TRANSFER;
-                        self.draw_pending = true;
+                    } else if self.draw_pending {
+                        self.draw_background_current_line(screen_buffer);
+                        self.draw_window_current_line(screen_buffer);
+                        self.draw_sprites_current_line(screen_buffer);
+
+                        self.draw_pending = false;
                     }
                 },
                 Mode::HBlank => {
@@ -188,23 +194,11 @@ impl Lcd {
                         if self.ly == 144 { 
                             self.mode = Mode::VBlank;
                             result.int_vblank = true;
-
-                            if self.lcdc.contains(Lcdc::LCDC_SPRITE_DISPLAY) {
-                                self.draw_sprites(screen_buffer);
-                            }
                         } else { 
                             self.mode = Mode::Oam;
 
                             self.check_coincidence(&mut result);
                         };
-                    } else {
-                        // Draw the current line if we're not in VBLANK period
-                        if self.ly < 144 && self.draw_pending {
-                            self.draw_current_background_line(screen_buffer);
-                            self.draw_current_window_line(screen_buffer);
-
-                            self.draw_pending = false;
-                        }
                     }
                 },
                 Mode::VBlank => {
@@ -244,7 +238,7 @@ impl Lcd {
     }
 
     // Draws the background for the current line specified in LY
-    fn draw_current_background_line(&self, screen_buffer: &mut [u32]) {
+    fn draw_background_current_line(&self, screen_buffer: &mut [u32]) {
         if self.lcdc.contains(Lcdc::LCDC_BG_DISPLAY) {
             // Background can be scrolled via the SCX and SCY registers
             let map_y = self.scy.wrapping_add(self.ly);
@@ -252,13 +246,13 @@ impl Lcd {
             for screen_x in 0..SCREEN_WIDTH as u8 {
                 let map_x = self.scx.wrapping_add(screen_x);
 
-                self.draw_bg_tile(map_x, map_y, screen_x, self.ly, screen_buffer);
+                self.draw_bg_tile_pixel(map_x, map_y, screen_x, self.ly, screen_buffer);
             }
         }
     }
 
     // Draws the window for the current line specified in LY
-    fn draw_current_window_line(&self, screen_buffer: &mut [u32]) {
+    fn draw_window_current_line(&self, screen_buffer: &mut [u32]) {
         if self.lcdc.contains(Lcdc::LCDC_WIN_DISPLAY) {
             // Window cannot scroll. The top-left is specified by the WY and WX registers. 
             // They are in relation to the top-left of the physical screen.
@@ -268,13 +262,13 @@ impl Lcd {
                     let map_y = self.ly - self.wy;
 
                     // X position is really WX - 7
-                    let windowx = (self.wx as isize) - 7;
+                    let window_x = (self.wx as isize) - 7;
 
                     for screen_x in 0..SCREEN_WIDTH as u8 {
-                        if windowx <= (screen_x as isize) {
-                            let map_x = screen_x - (windowx as u8);
+                        if window_x <= (screen_x as isize) {
+                            let map_x = screen_x - (window_x as u8);
 
-                            self.draw_win_tile(map_x, map_y, screen_x, self.ly, screen_buffer);
+                            self.draw_win_tile_pixel(map_x, map_y, screen_x, self.ly, screen_buffer);
                         }
                     }
                 }
@@ -285,34 +279,34 @@ impl Lcd {
     // Draws a background tile at the given coordinates.
     // map_x and map_y are the coordinates in the tile map
     // screen_x and screen_y are the coordinates of the physical screen
-    fn draw_bg_tile(&self, map_x: u8, map_y: u8, screen_x: u8, screen_y: u8, screen_buffer: &mut [u32]) {
+    fn draw_bg_tile_pixel(&self, map_x: u8, map_y: u8, screen_x: u8, screen_y: u8, screen_buffer: &mut [u32]) {
         let map_addr_base = if self.lcdc.contains(Lcdc::LCDC_BG_TILE_9C) {
             0x9C00
         } else {
             0x9800
         } as u16;
 
-        self.draw_tile(map_addr_base, map_x, map_y, screen_x, screen_y, screen_buffer);
+        self.draw_tile_pixel(map_addr_base, map_x, map_y, screen_x, screen_y, screen_buffer);
     }
 
     // Draws a window tile at the given coordinates.
     // map_x and map_y are the coordinates in the tile map
     // screen_x and screen_y are the coordinates of the physical screen
-    fn draw_win_tile(&self, map_x: u8, map_y: u8, screen_x: u8, screen_y: u8, screen_buffer: &mut [u32]) {
+    fn draw_win_tile_pixel(&self, map_x: u8, map_y: u8, screen_x: u8, screen_y: u8, screen_buffer: &mut [u32]) {
         let map_addr_base = if self.lcdc.contains(Lcdc::LCDC_WIN_TILE_9C) {
             0x9C00
         } else {
             0x9800
         } as u16;
 
-        self.draw_tile(map_addr_base, map_x, map_y, screen_x, screen_y, screen_buffer);
+        self.draw_tile_pixel(map_addr_base, map_x, map_y, screen_x, screen_y, screen_buffer);
     }
 
     // Draws a tile at the given coordinates.
     // map_addr_base is either 0x9C00 or 0x9800
     // map_x and map_y are the coordinates in the tile map
     // screen_x and screen_y are the coordinates of the physical screen
-    fn draw_tile(&self, map_addr_base: u16, map_x: u8, map_y: u8, screen_x: u8, screen_y: u8, screen_buffer: &mut [u32]) {
+    fn draw_tile_pixel(&self, map_addr_base: u16, map_x: u8, map_y: u8, screen_x: u8, screen_y: u8, screen_buffer: &mut [u32]) {
         // Each tile is 8x8 pixels.
         // Get the X,Y positions of the tile boundaries
         let map_tile_y = (map_y / 8) as u16;
@@ -335,54 +329,68 @@ impl Lcd {
         screen_buffer[(screen_y as usize * SCREEN_WIDTH) + screen_x as usize] = self.bgp.rgb(shade);
     }
 
-    // Draws all sprites on the screen.
-    // Unlike the background and window draw functions, this draws to the entire screen instead of the current line in LY
-    fn draw_sprites(&self, screen_buffer: &mut [u32]) {
-        // Sprites are 40 blocks in OAM. Each block is 32 bits
-        for idx in 0..40 {
-            let entry = &self.oam[idx as usize];
-            // X,Y values are offset by 8,16
-            let y = (entry.y as isize) - 16;
-            let x = (entry.x as isize) - 8;
+    // Draws sprites on the current line
+    fn draw_sprites_current_line(&self, screen_buffer: &mut [u32]) {
+        if self.lcdc.contains(Lcdc::LCDC_SPRITE_DISPLAY) {
+            let screen_y = self.ly as isize;
 
             // Sprites can be 8x8 or 8x16
-            let spr_height = if self.lcdc.contains(Lcdc::LCDC_8X16_SPRITE) { 16 } else { 8 };
+            let sprite_height = if self.lcdc.contains(Lcdc::LCDC_8X16_SPRITE) { 16 } else { 8 };
 
-            if x > -8 && x < 160 && y > -16 && y < 144 {
-                let tile_addr = self.sprite_tile_address(entry.tile);
+            // Find all sprites that will be visible on the current line
+            let line_sprite_idxs = (0..40 as usize).filter(|&idx| {
+                let entry = &self.oam[idx as usize];
+
+                // X,Y values are offset by 8,16
+                let y = (entry.y as isize) - 16;
+                let x = (entry.x as isize) - 8;
+
+                let end_y = y + (sprite_height - 1);
+
+               return x >= 0 && x < 160 && screen_y >= y && screen_y <= end_y;
+            }).collect::<Vec<_>>();
+
+            for screen_x in 0..SCREEN_WIDTH as isize { 
+                // Sprites are 40 blocks in OAM. Each block is 32 bits
+                for idx in &line_sprite_idxs {
+                    let entry = &self.oam[*idx];
+
+                    // X,Y values are offset by 8,16
+                    let y = (entry.y as isize) - 16;
+                    let x = (entry.x as isize) - 8;
+
+                    let end_x = x + 7;
+
+                    if screen_x >= x && screen_x <= end_x {
+                        let tile_addr = self.sprite_tile_address(entry.tile);
                 
-                // In DMG, the sprite can use one of two palletes
-                let palette = if entry.attrs & OAM_ATTR_PALETTE_DMG == OAM_ATTR_PALETTE_DMG { 
-                    self.obp1 
-                } else { 
-                    self.obp0
-                };
+                        // In DMG, the sprite can use one of two palletes
+                        let palette = if entry.attrs & OAM_ATTR_PALETTE_DMG == OAM_ATTR_PALETTE_DMG { 
+                            self.obp1 
+                        } else { 
+                            self.obp0
+                        };
 
-                for row in 0..spr_height as isize {
-                    for column in 0..8 as isize {
-                        // Sprite can be vertically flipped
-                        let screen_y = if entry.attrs & OAM_ATTR_Y_FLIP == OAM_ATTR_Y_FLIP {
-                            y + (row - spr_height).abs()
+                        let row = if entry.attrs & OAM_ATTR_Y_FLIP == OAM_ATTR_Y_FLIP {
+                            (screen_y - y - sprite_height).abs()
                         } else {
-                            y + row
+                            screen_y - y
                         };
 
                         // Sprite can also be horizontally flipped
-                        let screen_x = if entry.attrs & OAM_ATTR_X_FLIP == OAM_ATTR_X_FLIP {
-                            x + (column - 8).abs()
+                        let column = if entry.attrs & OAM_ATTR_X_FLIP == OAM_ATTR_X_FLIP {
+                            (screen_x - x - 7).abs()
                         } else {
-                            x + column
+                            screen_x - x
                         };
 
-                        // Only draw if pixel is on screen
-                        if screen_y >= 0 && screen_y < 144 && screen_x >= 0 && screen_x < 160 {
-                            let idx = (screen_y as usize * SCREEN_WIDTH) + screen_x as usize;
-                            let shade = self.tile_pixel_shade(tile_addr, row as u8, column as u8);
+                        let shade = self.tile_pixel_shade(tile_addr, row as u8, column as u8);
 
-                            // White shade is invisible
-                            if shade != Shade::White {
-                                screen_buffer[idx] = palette.rgb(shade);
-                            }
+                        // White shade is invisible
+                        if shade != Shade::White {
+                            let screen_buffer_idx = (screen_y as usize * SCREEN_WIDTH) + screen_x as usize;
+
+                            screen_buffer[screen_buffer_idx] = palette.rgb(shade);
                         }
                     }
                 }
@@ -428,7 +436,7 @@ impl Lcd {
         } as u16;
 
         if self.lcdc.contains(Lcdc::LCDC_UNSIGNED_TILE_DATA) {
-            (tile_addr_base + ((tile_index as u16) * 16))
+            tile_addr_base + ((tile_index as u16) * 16)
         } else {
             let signed_index = (tile_index as i8) as i16;
             ((tile_addr_base as i16) + ((signed_index) * 16)) as u16

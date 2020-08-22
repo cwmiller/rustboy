@@ -40,8 +40,8 @@ impl<'a> Rustboy<'a> {
         self.cpu.reset();
 
         // FPS counter variables
-        //let mut fps_counter_time = Instant::now();
-        //let mut fps_counter_frames = 0;
+        let mut fps_counter_time = Instant::now();
+        let mut fps_counter_frames = 0;
 
         let mut cycles_since_last_frame = 0;
         let mut time_since_last_frame = Instant::now();
@@ -96,7 +96,7 @@ impl<'a> Rustboy<'a> {
                 cycles_since_last_frame = 0;
                 time_since_last_frame = Instant::now();
 
-                /*
+
                 fps_counter_frames += 1;
 
                 // If a second has passed, update the FPS counter
@@ -107,7 +107,7 @@ impl<'a> Rustboy<'a> {
                     fps_counter_time = Instant::now();
                     fps_counter_frames = 0;
                 }
-                */
+                
 
                 self.set_button_presses(&mut buttons);
             }
