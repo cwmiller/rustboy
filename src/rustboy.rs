@@ -12,19 +12,28 @@ const CYCLES_PER_FRAME: usize = 69905;
 const MS_PER_FRAME: u128 = 16;
 
 pub struct Rustboy<'a> {
+    options: RustboyOptions,
     bus: Bus<'a>,
     cpu: Cpu,
     screen_buffer: [u32; SCREEN_WIDTH * SCREEN_HEIGHT],
     window: Window
 }
 
+#[derive(Clone, Copy, Debug)]
+pub struct RustboyOptions {
+    pub scale: Scale,
+    pub verbose: bool,
+    pub unlock_fps: bool
+}
+
 impl<'a> Rustboy<'a> {
-    pub fn new(cartridge: &'a mut Cartridge) -> Self {
+    pub fn new(cartridge: &'a mut Cartridge, options: RustboyOptions) -> Self {
         Self {
+            options: options,
             bus: Bus::new(cartridge),
             cpu: Cpu::new(),
             screen_buffer: [0; SCREEN_WIDTH * SCREEN_HEIGHT],
-            window: create_window(Scale::X4)
+            window: create_window(options.scale)
         }
     }
 
@@ -87,7 +96,7 @@ impl<'a> Rustboy<'a> {
                 if cycles_since_last_frame > CYCLES_PER_FRAME {
                     let elapsed = time_since_last_frame.elapsed();
 
-                    if elapsed.as_millis() < MS_PER_FRAME {
+                    if !self.options.unlock_fps && elapsed.as_millis() < MS_PER_FRAME {
                         // Sleep for the remaining time
                         thread::sleep(Duration::from_millis((MS_PER_FRAME - elapsed.as_millis()) as u64))
                     }
@@ -107,7 +116,6 @@ impl<'a> Rustboy<'a> {
                     fps_counter_time = Instant::now();
                     fps_counter_frames = 0;
                 }
-                
 
                 self.set_button_presses(&mut buttons);
             }

@@ -6,6 +6,7 @@ authors = ["Chase Miller"]
 [dependencies]
 bitflags = "1"
 byteorder = "1"
+clap = "2.33.3"
 enum_primitive = "*"
 fnv = "1"
 lazy_static = "1.4.0"
