@@ -87,7 +87,7 @@ pub struct Bus<'a> {
     high_ram: Ram,
     pub joypad: Joypad,
     pub lcd: Lcd,
-    serial: Serial,
+    pub serial: Serial,
     sound: Sound,
     pub timer: Timer,
     work_ram: Ram,
@@ -102,7 +102,7 @@ impl<'a> Bus<'a> {
             high_ram: Ram::new(HIGH_RAM_START, HIGH_RAM_SIZE),
             joypad: Joypad::new(),
             lcd: Lcd::new(),
-            serial: Serial::default(),
+            serial: Serial::new(),
             sound: Sound::default(),
             timer: Timer::new(),
             work_ram: Ram::new(WORK_RAM_START, WORK_RAM_SIZE)

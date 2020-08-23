@@ -65,6 +65,9 @@ impl<'a> Rustboy<'a> {
 
             // Step timer
             let timer_result = self.bus.timer.step(cycles);
+            
+            // Step serial port
+            let serial_result = self.bus.serial.step(cycles);
 
             // Step LCD
             let lcd_result = self.bus.lcd.step(cycles, &mut self.screen_buffer);
@@ -75,6 +78,11 @@ impl<'a> Rustboy<'a> {
             // The timer interrupts when the counter reaches its goal
             if timer_result.interrupt {
                 self.cpu.interrupt(&mut self.bus, Interrupt::Timer);
+            }
+
+            // Serial interrupt happens after a byte is transferred
+            if serial_result.interrupt {
+                self.cpu.interrupt(&mut self.bus, Interrupt::Serial);
             }
 
             // LCD can generate a STAT interrupt when modes change or when the cursor reaches a specific line
@@ -104,7 +112,6 @@ impl<'a> Rustboy<'a> {
 
                 cycles_since_last_frame = 0;
                 time_since_last_frame = Instant::now();
-
 
                 fps_counter_frames += 1;
 
