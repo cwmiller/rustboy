@@ -142,17 +142,13 @@ impl<'a> Rustboy<'a> {
 
         if self.window.is_key_down(Key::Up) {
             *buttons |= Button::UP;
+        } else if self.window.is_key_down(Key::Down) {
+            *buttons |= Button::DOWN;
         }
 
         if self.window.is_key_down(Key::Right) {
             *buttons |= Button::RIGHT;
-        }
-
-        if self.window.is_key_down(Key::Down) {
-            *buttons |= Button::DOWN;
-        }
-
-        if self.window.is_key_down(Key::Left) {
+        } else if self.window.is_key_down(Key::Left) {
             *buttons |= Button::LEFT;
         }
 
