@@ -65,19 +65,34 @@ const CYCLES_PER_LINE: usize = 456;
 enum_from_primitive! {
     #[derive(Copy, Clone, PartialEq)]
     enum Shade {
-        White       = 0,
-        LightGray   = 1,
-        DarkGray    = 2,
-        Black       = 3
+        White     = 0,
+        LightGray = 1,
+        DarkGray  = 2,
+        Black     = 3
     }
 }
 
+type ColorIndex = u8;
+
+// Color pallete is stored in an 8 bit value where each 2 bytes indicate the shade for each color index
+// aabbccdd
+// dd is the shade for color 0
+// cc is the shade for color 1
+// bb is the shade for color 2
+// aa is the shade for color 3
 #[derive(Copy, Clone)]
 struct Palette(u8);
 
 impl Palette {
-    fn rgb(&self, shade: Shade) -> u32 {
-        match shade {
+    fn rgb(&self, idx: ColorIndex) -> u32 {
+        if idx > 3 {
+            panic!("Color index cannot exceed 3");
+        }
+
+        // Shade can be retrieved by the shifting right
+        let shade_index = (self.0 >> (idx * 2)) & 0b11;
+
+        match Shade::from_u8(shade_index).unwrap() {
             Shade::White        => 0x9CBD0F,
             Shade::LightGray    => 0x8CAD0F,
             Shade::DarkGray     => 0x306230,
@@ -87,20 +102,35 @@ impl Palette {
 }
 
 // Represents an OAM (Sprite data)
-#[derive(Default, Copy, Clone)]
+#[derive(Copy, Clone)]
 struct OamEntry {
     y: u8,
     x: u8,
     tile: u8,
-    attrs: u8 
+    attrs: OamAttr
 }
 
-const OAM_ATTR_OBJ_PRIORITY: u8     = 0b1000_0000;
-const OAM_ATTR_Y_FLIP: u8           = 0b0100_0000;
-const OAM_ATTR_X_FLIP: u8           = 0b0010_0000;
-const OAM_ATTR_PALETTE_DMG: u8      = 0b0001_0000;
-const OAM_ATTR_TILE_BANK_CGB: u8    = 0b0000_1000;
-const OAM_ATTR_PALETTE_CGB: u8      = 0b0000_0111;
+impl OamEntry {
+    pub fn new() -> Self {
+        Self { 
+            y: 0,
+            x: 0,
+            tile: 0,
+            attrs: OamAttr::empty()
+        }
+    }
+}
+
+bitflags! {
+    struct OamAttr: u8 {
+        const OAM_ATTR_OBJ_PRIORITY     = 0b1000_0000;
+        const OAM_ATTR_Y_FLIP           = 0b0100_0000;
+        const OAM_ATTR_X_FLIP           = 0b0010_0000;
+        const OAM_ATTR_PALETTE_DMG      = 0b0001_0000;
+        const OAM_ATTR_TILE_BANK_CGB    = 0b0000_1000;
+        const OAM_ATTR_PALETTE_CGB      = 0b0000_0111;
+    }
+}
 
 #[derive(Default)]
 pub struct StepResult {
@@ -131,7 +161,7 @@ impl Lcd {
     pub fn new() -> Self {
         Self {
             vram: [0; (VIDEO_RAM_END - VIDEO_RAM_START) as usize + 1],
-            oam: [OamEntry::default(); (OAM_END - OAM_START) as usize + 1],
+            oam: [OamEntry::new(); (OAM_END - OAM_START) as usize + 1],
             lcdc: Lcdc::from_bits(0x91).unwrap(),
             stat: Stat::empty(),
             scy: 0,
@@ -324,9 +354,9 @@ impl Lcd {
         let tile_addr = self.tile_address(tile_idx);
 
         // Read the Tile Pattern Table to get what color pixel to display at the given screen coordinates
-        let shade = self.tile_pixel_shade(tile_addr, tile_row, tile_column);
+        let color = self.tile_pixel_color(tile_addr, tile_row, tile_column);
 
-        screen_buffer[(screen_y as usize * SCREEN_WIDTH) + screen_x as usize] = self.bgp.rgb(shade);
+        screen_buffer[(screen_y as usize * SCREEN_WIDTH) + screen_x as usize] = self.bgp.rgb(color);
     }
 
     // Draws sprites on the current line
@@ -365,32 +395,32 @@ impl Lcd {
                         let tile_addr = self.sprite_tile_address(entry.tile);
                 
                         // In DMG, the sprite can use one of two palletes
-                        let palette = if entry.attrs & OAM_ATTR_PALETTE_DMG == OAM_ATTR_PALETTE_DMG { 
+                        let palette = if entry.attrs.contains(OamAttr::OAM_ATTR_PALETTE_DMG) { 
                             self.obp1 
                         } else { 
                             self.obp0
                         };
 
-                        let row = if entry.attrs & OAM_ATTR_Y_FLIP == OAM_ATTR_Y_FLIP {
+                        let row = if entry.attrs.contains(OamAttr::OAM_ATTR_Y_FLIP) {
                             (screen_y - y - sprite_height).abs()
                         } else {
                             screen_y - y
                         };
 
                         // Sprite can also be horizontally flipped
-                        let column = if entry.attrs & OAM_ATTR_X_FLIP == OAM_ATTR_X_FLIP {
+                        let column = if entry.attrs.contains(OamAttr::OAM_ATTR_X_FLIP) {
                             (screen_x - x - 7).abs()
                         } else {
                             screen_x - x
                         };
 
-                        let shade = self.tile_pixel_shade(tile_addr, row as u8, column as u8);
+                        let color = self.tile_pixel_color(tile_addr, row as u8, column as u8);
 
-                        // White shade is invisible
-                        if shade != Shade::White {
+                        // Color 0 is hidden for sprites
+                        if color != 0 {
                             let screen_buffer_idx = (screen_y as usize * SCREEN_WIDTH) + screen_x as usize;
 
-                            screen_buffer[screen_buffer_idx] = palette.rgb(shade);
+                            screen_buffer[screen_buffer_idx] = palette.rgb(color);
                         }
                     }
                 }
@@ -398,17 +428,17 @@ impl Lcd {
         }
     }
 
-    // Gets the shade of a pixel within a tile
-    fn tile_pixel_shade(&self, address: u16, row: u8, column: u8) -> Shade {
+    // Gets the color of a pixel within a tile
+    fn tile_pixel_color(&self, address: u16, row: u8, column: u8) -> ColorIndex {
         let upper_byte = self.vram[((address + (row * 2) as u16) + 1 - VIDEO_RAM_START) as usize];
         let lower_byte = self.vram[((address + (row * 2) as u16) - VIDEO_RAM_START) as usize];
 
+        
         let shift = 7 - column;
-        let mask = 1 << shift;
-        let upper_bit = (upper_byte & mask) >> shift;
-        let lower_bit = (lower_byte & mask) >> shift;
+        let upper_bit = (upper_byte >> shift) & 0b1;
+        let lower_bit = (lower_byte >> shift) & 0b1;
 
-        Shade::from_u8((upper_bit << 1) | lower_bit).unwrap()
+        (upper_bit << 1) | lower_bit
     }
 
     // A cycle can raise a STAT interrupt when LY matches LYC
@@ -465,7 +495,7 @@ impl Addressable for Lcd {
                     0 => entry.y,
                     1 => entry.x,
                     2 => entry.tile,
-                    3 => entry.attrs,
+                    3 => entry.attrs.bits(),
                     _ => unreachable!()
                 }
             },
@@ -504,7 +534,7 @@ impl Addressable for Lcd {
                         0 => { entry.y = val },
                         1 => { entry.x = val },
                         2 => { entry.tile = val },
-                        3 => { entry.attrs = val },
+                        3 => { entry.attrs = OamAttr::from_bits(val).unwrap() },
                         _ => unreachable!()
                     }
                 }
