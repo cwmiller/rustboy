@@ -61,6 +61,8 @@ const CYCLES_PER_TRANSFER: usize = 172;
 const CYCLES_PER_HBLANK: usize = 204;
 const CYCLES_PER_LINE: usize = 456;
 
+
+
 // DMG can only display four beautiful shades of color
 enum_from_primitive! {
     #[derive(Copy, Clone, PartialEq)]
@@ -102,7 +104,7 @@ impl Palette {
 }
 
 // Represents an OAM (Sprite data)
-#[derive(Copy, Clone)]
+#[derive(Copy, Clone, Debug)]
 struct OamEntry {
     y: u8,
     x: u8,
@@ -235,7 +237,7 @@ impl Lcd {
                     // LCD is writing to VBlank lines
                     if self.mode_cycles >= CYCLES_PER_LINE {
                         self.mode_cycles -= CYCLES_PER_LINE;
-                        self.ly = self.ly + 1;
+                        self.ly += 1;
 
                         if self.ly > 153 {
                             // Finished with VBlank. Enter OAM with the first line.
@@ -251,12 +253,10 @@ impl Lcd {
             // Check if a new mode has been entered during this step.
             // If so, an interrupt will be raised if the respective flag is set in the STAT register
             if self.mode != previous_mode {
-                let raise = match self.mode {
-                    Mode::HBlank   => self.stat.contains(Stat::STAT_HBLANK_INT) || self.stat.contains(Stat::STAT_OAM_INT),
-                    Mode::VBlank   => self.stat.contains(Stat::STAT_VBLANK_INT),
-                    Mode::Oam      => self.stat.contains(Stat::STAT_OAM_INT),
-                    Mode::Transfer => false
-                };
+                let raise = 
+                    self.stat.contains(Stat::STAT_HBLANK_INT) && self.mode == Mode::HBlank
+                    || self.stat.contains(Stat::STAT_VBLANK_INT) && self.mode == Mode::VBlank
+                    || self.stat.contains(Stat::STAT_OAM_INT) && (self.mode == Mode::Transfer || self.mode == Mode::VBlank);
 
                 if raise {
                     result.int_stat = true;
@@ -295,10 +295,14 @@ impl Lcd {
                     let window_x = (self.wx as isize) - 7;
 
                     for screen_x in 0..SCREEN_WIDTH as u8 {
-                        if window_x <= (screen_x as isize) {
-                            let map_x = screen_x - (window_x as u8);
+                        let screen_x_i = screen_x as isize;
 
-                            self.draw_win_tile_pixel(map_x, map_y, screen_x, self.ly, screen_buffer);
+                        if window_x <= screen_x_i {
+                            let map_x_i = screen_x_i - window_x;
+
+                            if map_x_i >= 0 && map_x_i < 256 {
+                                self.draw_win_tile_pixel(map_x_i as u8, map_y, screen_x, self.ly, screen_buffer);
+                            }
                         }
                     }
                 }
@@ -396,7 +400,7 @@ impl Lcd {
                 
                         // In DMG, the sprite can use one of two palletes
                         let palette = if entry.attrs.contains(OamAttr::OAM_ATTR_PALETTE_DMG) { 
-                            self.obp1 
+                            self.obp1
                         } else { 
                             self.obp0
                         };
@@ -520,6 +524,8 @@ impl Addressable for Lcd {
                 // Only allow write if LCD is disabled or in Mode 00 (HBlank), 01 (VBLANK), or 10 (OAM)
                 if !self.lcdc.contains(Lcdc::LCDC_ENABLED) || self.mode != Mode::Transfer {
                     self.vram[(addr - VIDEO_RAM_START) as usize] = val;
+                } else {
+                    println!("Attempted VRAM write during mode {}. Mode cycles: {}", self.mode as u8, self.mode_cycles);
                 }
             },
             OAM_START..=OAM_END => {
