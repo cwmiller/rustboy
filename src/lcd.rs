@@ -1,5 +1,6 @@
 use bus::{Addressable, OAM_START, OAM_END, VIDEO_RAM_START, VIDEO_RAM_END};
 use enum_primitive::FromPrimitive;
+use log::{error, warn};
 
 pub const SCREEN_WIDTH: usize = 160;
 pub const SCREEN_HEIGHT: usize = 144;
@@ -88,7 +89,7 @@ struct Palette(u8);
 impl Palette {
     fn rgb(&self, idx: ColorIndex) -> u32 {
         if idx > 3 {
-            panic!("Color index cannot exceed 3");
+            error!("Received a color index exceeding 3.");
         }
 
         // Shade can be retrieved by the shifting right
@@ -514,7 +515,7 @@ impl Addressable for Lcd {
             ADDR_OBP1 => self.obp1.0,
             ADDR_WY => self.wy,
             ADDR_WX => self.wx,
-            _ => { println!("LCD IO read unimplemented ({:#X})", addr); 0 }
+            _ => { warn!("LCD IO read unimplemented ({:#X})", addr); 0 }
         }
     }
 
@@ -525,7 +526,7 @@ impl Addressable for Lcd {
                 if !self.lcdc.contains(Lcdc::LCDC_ENABLED) || self.mode != Mode::Transfer {
                     self.vram[(addr - VIDEO_RAM_START) as usize] = val;
                 } else {
-                    println!("Attempted VRAM write during mode {}. Mode cycles: {}", self.mode as u8, self.mode_cycles);
+                    warn!("Attempted VRAM write during mode {}. Mode cycles: {}", self.mode as u8, self.mode_cycles);
                 }
             },
             OAM_START..=OAM_END => {
@@ -567,7 +568,7 @@ impl Addressable for Lcd {
             ADDR_OBP1 => self.obp1 = Palette(val),
             ADDR_WY => self.wy = val,
             ADDR_WX => self.wx = val,
-            _ => println!("LCD IO write unimplemented {:#X} -> {:#X}", val, addr)
+            _ => warn!("LCD IO write unimplemented {:#X} -> {:#X}", val, addr)
         }
     }
 }

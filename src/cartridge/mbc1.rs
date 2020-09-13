@@ -1,4 +1,5 @@
 use enum_primitive::FromPrimitive;
+use log::{warn, error};
 use super::Mapper;
 
 struct BankSelection(u8);
@@ -112,10 +113,16 @@ impl Mapper for Mbc1 {
                 if self.ram_enabled {
                     self.ram_data[self.ram_index(addr)]
                 } else {
+                    warn!("Attempted read from RAM address {:X} while RAM is disabled.", addr);
+
                     0xFF
                 }
             },
-            _ => panic!("Address {:#X} not handled by MBC1")
+            _ => {
+                error!("Address {:#X} not handled by MBC1", addr);
+
+                0xFF
+            }
         }
     }
 
@@ -143,13 +150,13 @@ impl Mapper for Mbc1 {
                 if self.ram_enabled {
                     let index = self.ram_index(addr);
                     if index >= self.ram_data.len() {
-                        println!("Attempted to write to out-of-bounds MBC1 RAM index {}, addr {:X}.", index, addr);
+                        warn!("Attempted to write to out-of-bounds MBC1 RAM index {}, addr {:X}.", index, addr);
                     } else {
                         self.ram_data[index] = val;
                     }
                 }
             },
-             _ => panic!("Address {:#X} not handled by MBC1")
+             _ => error!("Attempted to write to address {:#X} not handled by MBC1", addr)
         }
     }
 }

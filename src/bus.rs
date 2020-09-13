@@ -1,6 +1,7 @@
 use cartridge::Cartridge;
 use joypad::Joypad;
 use lcd::Lcd;
+use log::warn;
 use serial::Serial;
 use sound::Sound;
 use timer::Timer;
@@ -152,7 +153,7 @@ impl<'a> Addressable for Bus<'a> {
             HIGH_RAM_START..=HIGH_RAM_END => self.high_ram.read(addr),
             // 0xFFFF IE IO port
             IO_IE_ADDR => self.io_ie,
-            _ => { println!("Unimplemented read ({:#X})", addr); 0xFF }
+            _ => { warn!("Unimplemented read ({:#X})", addr); 0xFF }
         }
     }
 
@@ -190,7 +191,7 @@ impl<'a> Addressable for Bus<'a> {
             HIGH_RAM_START..=HIGH_RAM_END => self.high_ram.write(addr, val),
             // 0xFFFF IE IO port
             IO_IE_ADDR => self.io_ie = val,
-            _ => println!("Unimplemented write ({:#X} -> {:#X})", val, addr)
+            _ => warn!("Unimplemented write ({:#X} -> {:#X})", val, addr)
         }
     }
 }

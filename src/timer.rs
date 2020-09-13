@@ -1,5 +1,6 @@
 use bus::Addressable;
 use enum_primitive::FromPrimitive;
+use log::warn;
 
 const ADDR_DIV: u16  = 0xFF04;
 const ADDR_TIMA: u16 = 0xFF05;
@@ -99,7 +100,7 @@ impl Addressable for Timer {
             ADDR_TIMA => self.tima,
             ADDR_TMA => self.tma,
             ADDR_TAC => 0b1111_1000 | ((self.tac_enabled as u8) << 2) | (self.tac_freq as u8),
-            _ => { println!("Timer read unimplemented ({:#X})", addr); 0 }
+            _ => { warn!("Timer read unimplemented ({:#X})", addr); 0 }
         }
     }
 
@@ -113,7 +114,7 @@ impl Addressable for Timer {
                 self.tac_enabled = (val & 0b100) == 0b100;
                 self.tac_freq = TacFrequency::from_u8(val & 0b11).unwrap();
             },
-            _ => println!("Timer write unimplemented {:#X} -> {:#X}", val, addr)
+            _ => warn!("Timer write unimplemented {:#X} -> {:#X}", val, addr)
         }
     }
 }

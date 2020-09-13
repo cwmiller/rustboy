@@ -22,7 +22,6 @@ pub struct Rustboy<'a> {
 #[derive(Clone, Copy, Debug)]
 pub struct RustboyOptions {
     pub scale: Scale,
-    pub verbose: bool,
     pub unlock_fps: bool
 }
 
