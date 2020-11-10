@@ -1,7 +1,9 @@
 mod mbc1;
+mod mbc5;
 
 use bus::Addressable;
 use self::mbc1::Mbc1;
+use self::mbc5::Mbc5;
 use std::fmt;
 use std::fs::File;
 use std::io::Read;
@@ -185,6 +187,8 @@ fn total_ram_banks(code: u8) -> usize {
 fn create_mapper(mapper_type: MapperType, rom_banks: usize, ram_banks: usize) -> Box<dyn Mapper> {
     match mapper_type {
         MapperType::Mbc1 => Box::new(Mbc1::new(rom_banks, ram_banks)),
+        MapperType::Mbc5 => Box::new(Mbc5::new(rom_banks, ram_banks)),
+
         _ => panic!("Mapper {} not implemented.", mapper_type)
     }
 }
