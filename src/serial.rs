@@ -9,6 +9,7 @@ const INT_CLOCK_CYCLES: usize = 8192;
 bitflags! {
     struct Sc: u8 {
         const SC_START_TRANSFER    = 0b1000_0000;   // Setting bit enables transfer. Bit is reset upon completion.
+        const SC_FAST_SPEED_GBC    = 0b0000_0010;
         const SC_CLOCK             = 0b0000_0001;   // Setting bit enables internal clock.
     }
 }
@@ -78,7 +79,7 @@ impl Addressable for Serial {
     fn write(&mut self, addr: u16, byte: u8) {
         match addr {
             ADDR_SB => self.sb = byte,
-            ADDR_SC => self.sc = Sc::from_bits(byte).unwrap(),
+            ADDR_SC => self.sc = Sc::from_bits(byte & 0b1000_0001).unwrap(),
             _ => unreachable!()
         };
     }
