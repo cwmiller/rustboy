@@ -60,6 +60,8 @@ fn interrupt_start_address(interrupt: Interrupt) -> u16 {
     }
 }
 
+// Number of clock cycles (not machine cycles) used by each instruction. 
+// First number is cycles used if instruction is conditional and condition is met. Secodn number if cycles used if condition is not met.
 static CYCLES: &'static [(usize, usize)] = &[
     (4, 4), (12, 12), (8, 8), (8, 8), (4, 4), (4, 4), (8, 8), (4, 4), (20, 20), (8, 8), (8, 8), (8, 8), (4, 4), (4, 4), (8, 8), (4, 4),
     (4, 4), (12, 12), (8, 8), (8, 8), (4, 4), (4, 4), (8, 8), (4, 4), (12, 12), (8, 8), (8, 8), (8, 8), (4, 4), (4, 4), (8, 8), (4, 4),
@@ -139,7 +141,7 @@ impl Cpu {
             let decoded = self.decode_next_instruction(bus);
             let condition_met = inst::execute(self, bus, &decoded.instruction);
 
-            let instruction_cycles = 
+            let (cond_met_cycles, cond_not_met_cycles) = 
                 if decoded.prefixed {
                     PREFIXED_CYCLES[decoded.opcode as usize & 0x0F]
                 } else {
@@ -148,9 +150,9 @@ impl Cpu {
 
             used_cycles = 
                 if condition_met { 
-                    instruction_cycles.1 
+                    cond_met_cycles
                 } else { 
-                    instruction_cycles.0 
+                    cond_not_met_cycles
                 }
         };
 
