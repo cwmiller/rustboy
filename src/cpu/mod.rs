@@ -230,7 +230,7 @@ impl Cpu {
 
         let interrupts = bus.read(IO_IF_ADDR) & bus.read(IO_IE_ADDR);
         if interrupts > 0 {
-            let mut flag = Interrupt::Joypad as u8;
+            let mut flag = Interrupt::VBlank as u8;
             while flag > 0 {
                 if interrupts & flag == flag {
                     let interrupt = Interrupt::from_u8(flag).unwrap();
@@ -238,7 +238,7 @@ impl Cpu {
                     break;
                 }
 
-                flag = flag >> 1;
+                flag = flag << 1;
             }
         }
 
