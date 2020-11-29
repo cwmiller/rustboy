@@ -11,8 +11,8 @@ enum_from_primitive! {
     #[derive(Copy, Clone)]
     enum TacFrequency {
         Khz4 = 0,
-        Khz262 = 1,
-        Khz65 = 2,
+        Khz256 = 1,
+        Khz64 = 2,
         Khz16 = 3
     }
 }
@@ -22,8 +22,8 @@ impl TacFrequency {
         match *self {
             TacFrequency::Khz4 => 1024,
             TacFrequency::Khz16 => 256,
-            TacFrequency::Khz65 => 64,
-            TacFrequency::Khz262 => 16
+            TacFrequency::Khz64 => 64,
+            TacFrequency::Khz256 => 16
         }
     }
 }
@@ -34,26 +34,26 @@ pub struct TimerResult {
 }
 
 pub struct Timer {
-    div: u16,
+    div: u8,
     tima: u8,
     tma: u8,
     tac_enabled: bool,
     tac_freq: TacFrequency,
 
-    div_counter: usize,
-    tima_counter: usize
+    div_cycles: usize,
+    tima_cycles: usize
 }
 
 impl Timer {
     pub fn new() -> Self {
         Self {
-            div: 0xABCC,
+            div: 0xAB,
             tima: 0,
             tma: 0,
             tac_enabled: false,
             tac_freq: TacFrequency::Khz4,
-            div_counter: 0,
-            tima_counter: 0
+            div_cycles: 0,
+            tima_cycles: 0
         }
     }
 
@@ -62,21 +62,21 @@ impl Timer {
         let mut result = TimerResult::default();
 
         // DIV always counts at a constant interval even if the timer is disabled
-        // DIV increments once every ~256 machine cycles
-        self.div_counter += cycles;
+        // DIV increments once every ~256 clock cycles
+        self.div_cycles += cycles;
 
-        if self.div_counter >= 256 {
+        if self.div_cycles >= 256 {
             self.div = self.div.wrapping_add(1);
-            self.div_counter -= 256;
+            self.div_cycles -= 256;
         }
 
         // TIMA counts if TAC is enabled. It counts at an interval set by TAC.
         if self.tac_enabled {
-            self.tima_counter += cycles;
+            self.tima_cycles += cycles;
 
             let tac_cycles = self.tac_freq.as_cycles();
 
-            if self.tima_counter >= tac_cycles {
+            if self.tima_cycles >= tac_cycles {
                 // When TIMA overflows, it is reset to TMA and an interrupt is raised.
                 if self.tima == 0xFF {
                     self.tima = self.tma;
@@ -85,7 +85,7 @@ impl Timer {
                     self.tima += 1;
                 }
 
-                self.tima_counter -= tac_cycles;
+                self.tima_cycles -= tac_cycles;
             }
         }
 
@@ -96,7 +96,7 @@ impl Timer {
 impl Addressable for Timer {
     fn read(&self, addr: u16) -> u8 {
         match addr {
-            ADDR_DIV => (self.div >> 8) as u8, // Retrieving DIV only returns the MSB,
+            ADDR_DIV => self.div,
             ADDR_TIMA => self.tima,
             ADDR_TMA => self.tma,
             ADDR_TAC => 0b1111_1000 | ((self.tac_enabled as u8) << 2) | (self.tac_freq as u8),
@@ -106,8 +106,12 @@ impl Addressable for Timer {
 
     fn write(&mut self, addr: u16, val: u8) {
         match addr {
-            // Writing any value to DIV resets it to 0
-            ADDR_DIV => self.div = 0,
+            // Writing any value to DIV resets the whole counter
+            ADDR_DIV => {
+                self.div = 0;
+                self.div_cycles = 0;
+                self.tima_cycles = 0;
+            },
             ADDR_TIMA => self.tima = val,
             ADDR_TMA => self.tma = val,
             ADDR_TAC => {
