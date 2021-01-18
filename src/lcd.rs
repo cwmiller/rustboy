@@ -407,7 +407,7 @@ impl Lcd {
                         };
 
                         let row = if entry.attrs.contains(OamAttr::OAM_ATTR_Y_FLIP) {
-                            (screen_y - y - sprite_height).abs()
+                            (screen_y - y - sprite_height + 1).abs()
                         } else {
                             screen_y - y
                         };
