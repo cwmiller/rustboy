@@ -104,6 +104,8 @@ impl Palette {
     }
 }
 
+const WHITE_RGB: u32 = 0x9CBD0F;
+
 // Represents an OAM (Sprite data)
 #[derive(Copy, Clone, Debug)]
 struct OamEntry {
@@ -425,7 +427,10 @@ impl Lcd {
                         if color != 0 {
                             let screen_buffer_idx = (screen_y as usize * SCREEN_WIDTH) + screen_x as usize;
 
-                            screen_buffer[screen_buffer_idx] = palette.rgb(color);
+                            // Sprite can be hidden behind BG layer if PRIORITY flag is set and background color is anything but white
+                            if !entry.attrs.contains(OamAttr::OAM_ATTR_OBJ_PRIORITY) || screen_buffer[screen_buffer_idx] != WHITE_RGB {
+                                screen_buffer[screen_buffer_idx] = palette.rgb(color);
+                            }
                         }
                     }
                 }
